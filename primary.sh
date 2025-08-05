@@ -143,6 +143,7 @@ OUTPUT_DIR="$(dirname "$OUTPUT_FILE")"
 # Default mode (auto)
 CURRENT_MODE="auto"
 THRESHOLD=5.0  # Default threshold in meters
+RELAY_SUB_PID=0
 
 echo "Starting ultrasonic sensor monitoring..."
 echo "Sensor: $SENSOR_DIR"
@@ -172,6 +173,15 @@ control_relay() {
     esac
 }
 
+# Function to handle relay subscription
+start_relay_subscription() {
+    mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
+        -t "$MQTT_RELAY_TOPIC" -q "$MQTT_QOS" | \
+    while read -r topic message; do
+        control_relay "$message"
+    done
+}
+
 # Function to handle mode changes
 handle_mode_change() {
     local new_mode="$1"
@@ -180,8 +190,19 @@ handle_mode_change() {
             if [[ "$CURRENT_MODE" != "$new_mode" ]]; then
                 echo "$(date): Switching from $CURRENT_MODE to $new_mode mode"
                 CURRENT_MODE="$new_mode"
+                
                 # When switching to auto mode, ensure relay is off initially
-                [[ "$CURRENT_MODE" == "auto" ]] && control_relay "OFF"
+                if [[ "$CURRENT_MODE" == "auto" ]]; then
+                    control_relay "OFF"
+                    if [[ $RELAY_SUB_PID -ne 0 ]]; then
+                        kill $RELAY_SUB_PID 2>/dev/null || true
+                        RELAY_SUB_PID=0
+                    fi
+                else
+                    # Start relay subscription in manual mode
+                    start_relay_subscription &
+                    RELAY_SUB_PID=$!
+                fi
             fi
             ;;
         *)
@@ -190,29 +211,12 @@ handle_mode_change() {
     esac
 }
 
-# Start MQTT subscriptions in background
+# Start MQTT subscription for mode changes in background
 (
-    while true; do
-        echo "$(date): Starting MQTT subscriptions..."
-        
-        # Always subscribe to mode changes
-        mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
-            -t "$MQTT_MODE_TOPIC" -q "$MQTT_QOS" | \
-        while read -r topic message; do
-            handle_mode_change "$message"
-        done
-        
-        # Only subscribe to relay commands in manual mode
-        if [[ "$CURRENT_MODE" == "manual" ]]; then
-            echo "$(date): Subscribing to relay control in manual mode..."
-            mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
-                -t "$MQTT_RELAY_TOPIC" -q "$MQTT_QOS" | \
-            while read -r topic message; do
-                control_relay "$message"
-            done
-        fi
-        
-        sleep 5  # Wait before reconnecting if connection drops
+    mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
+        -t "$MQTT_MODE_TOPIC" -q "$MQTT_QOS" | \
+    while read -r topic message; do
+        handle_mode_change "$message"
     done
 ) &
 
