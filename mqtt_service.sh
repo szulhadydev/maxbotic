@@ -13,13 +13,16 @@ export MQTT_CLIENT_ID="${MQTT_CLIENT_ID:-cm4-1}"
 
 # Add new MQTT topic for mode control
 export MQTT_MODE_TOPIC="${MQTT_MODE_TOPIC:-dtonggang/ultrasonic-01/mode/control}"
-# MQTT_MODE_TOPIC="control/mode"
+
+# Add new MQTT topic to set threshold 
+export MQTT_THRESHOLD_TOPIC="${MQTT_THRESHOLD_TOPIC:-dtonggang/ultrasonic-01/threshold/set}"
 
 # Default mode (can be overridden at runtime via MQTT)
 CURRENT_MODE="AUTO"
 
 # Distance threshold (meters) for triggering relay in AUTO mode
-DISTANCE_THRESHOLD=5.0
+# DISTANCE_THRESHOLD=5.0
+DISTANCE_THRESHOLD="${DISTANCE_THRESHOLD:-1.0}"  # fallback if /tmp not yet written
 
 # Optional MQTT Authentication (uncomment and set if needed)
 # export MQTT_USERNAME="your_username"

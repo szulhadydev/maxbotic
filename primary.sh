@@ -156,6 +156,10 @@ echo "Starting ultrasonic sensor monitoring..."
 echo "AUTO" > /tmp/current_mode
 CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
 
+# Default mode is AUTO
+echo "AUTO" > /tmp/current_threshold
+CURRENT_THRESHOLD=$(cat /tmp/current_mode 2>/dev/null || echo "5.0")
+
 echo "Sensor: $SENSOR_DIR"
 echo "MQTT Broker: $MQTT_BROKER:$MQTT_PORT"
 echo "Publish Topic: $MQTT_TOPIC"
@@ -187,6 +191,7 @@ control_relay() {
     until mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
         -t "$MQTT_SUBSCRIBE_TOPIC" \
         -t "$MQTT_MODE_TOPIC" \
+        -t "$MQTT_THRESHOLD_TOPIC" \
         -q "$MQTT_QOS" -v | while read -r full_message; do
 
         topic=$(cut -d' ' -f1 <<< "$full_message")
@@ -207,8 +212,16 @@ control_relay() {
             else
                 echo "$(date): AUTO mode - ignoring manual command: $message"
             fi
-        fi
+        #fi
 
+        elif [[ "$topic" == "$MQTT_THRESHOLD_TOPIC" ]]; then
+            if [[ "$message" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+                echo "$message" > /tmp/current_threshold
+                echo "$(date): Threshold updated to: $message"
+            else
+                echo "$(date): Invalid threshold received: $message"
+            fi
+        fi
     done
     do
         echo "$(date): mosquitto_sub crashed or disconnected. Retrying in 5 seconds..." >&2
@@ -234,7 +247,8 @@ while true; do
     "timestamp": "$TIMESTAMP",
     "sensor_id": "$MQTT_CLIENT_ID",
     "raw_value": $RAW_VALUE,
-    "mode": "$CURRENT_MODE"
+    "mode": "$CURRENT_MODE",
+    "threshold": "$CURRENT_THRESHOLD",
 }
 JSON_EOF
         )
@@ -256,7 +270,13 @@ JSON_EOF
         # Only perform automatic control if in AUTO mode
         CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
         if [[ $CURRENT_MODE == "AUTO" ]]; then
-            if (( $(echo "$ULTRASONIC_DISTANCE < $DISTANCE_THRESHOLD" | bc -l) )); then
+
+            CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "$DISTANCE_THRESHOLD")
+
+            if (( $(echo "$ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD" | bc -l) )); then
+
+
+            #if (( $(echo "$ULTRASONIC_DISTANCE < $DISTANCE_THRESHOLD" | bc #-l) )); then
                 echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE below threshold ($DISTANCE_THRESHOLD), triggering relay ON"
                 control_relay "ON"
             else
