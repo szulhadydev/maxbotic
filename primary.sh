@@ -140,8 +140,8 @@ fi
 OUTPUT_DIR="$(dirname "$OUTPUT_FILE")"
 [[ ! -d "$OUTPUT_DIR" ]] && mkdir -p "$OUTPUT_DIR"
 
-# Default mode (auto)
-CURRENT_MODE="auto"
+# Default mode (manual)
+CURRENT_MODE="manual"
 THRESHOLD=5.0  # Default threshold in meters
 RELAY_SUB_PID=0
 
