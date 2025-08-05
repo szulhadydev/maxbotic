@@ -12,7 +12,8 @@ export MQTT_SUBSCRIBE_TOPIC="${MQTT_SUBSCRIBE_TOPIC:-dtonggang/ultrasonic-01/rel
 export MQTT_CLIENT_ID="${MQTT_CLIENT_ID:-cm4-1}"
 
 # Add new MQTT topic for mode control
-MQTT_MODE_TOPIC="control/mode"
+export MQTT_MODE_TOPIC="${MQTT_MODE_TOPIC:-dtonggang/ultrasonic-01/mode/control}"
+# MQTT_MODE_TOPIC="control/mode"
 
 # Default mode (can be overridden at runtime via MQTT)
 CURRENT_MODE="AUTO"
