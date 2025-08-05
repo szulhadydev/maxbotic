@@ -140,47 +140,79 @@ fi
 OUTPUT_DIR="$(dirname "$OUTPUT_FILE")"
 [[ ! -d "$OUTPUT_DIR" ]] && mkdir -p "$OUTPUT_DIR"
 
+# Default mode (auto)
+CURRENT_MODE="auto"
+THRESHOLD=5.0  # Default threshold in meters
+
 echo "Starting ultrasonic sensor monitoring..."
 echo "Sensor: $SENSOR_DIR"
 echo "MQTT Broker: $MQTT_BROKER:$MQTT_PORT"
 echo "Publish Topic: $MQTT_TOPIC"
-echo "Subscribe Topic: $MQTT_SUBSCRIBE_TOPIC"
+echo "Mode Control Topic: $MQTT_MODE_TOPIC"
+echo "Relay Control Topic: $MQTT_RELAY_TOPIC"
 echo "Measurement interval: ${MEASUREMENT_INTERVAL}s"
+echo "Initial mode: $CURRENT_MODE"
+echo "Threshold: ${THRESHOLD}m"
 
-# Function to control relay based on MQTT messages
+# Function to control relay
 control_relay() {
-    local message="$1"
-    case "$message" in
+    local state="$1"
+    case "$state" in
         "ON"|"1")
-            echo "$(date): Received command to turn relay ON"
+            echo "$(date): Turning relay ON"
             mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
             ;;
         "OFF"|"0")
-            echo "$(date): Received command to turn relay OFF"
+            echo "$(date): Turning relay OFF"
             mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
             ;;
         *)
-            echo "$(date): Received unknown relay command: $message"
+            echo "$(date): Unknown relay command: $state"
             ;;
     esac
 }
 
-# Start MQTT subscription in background with retry on failure
+# Function to handle mode changes
+handle_mode_change() {
+    local new_mode="$1"
+    case "$new_mode" in
+        "auto"|"manual")
+            if [[ "$CURRENT_MODE" != "$new_mode" ]]; then
+                echo "$(date): Switching from $CURRENT_MODE to $new_mode mode"
+                CURRENT_MODE="$new_mode"
+                # When switching to auto mode, ensure relay is off initially
+                [[ "$CURRENT_MODE" == "auto" ]] && control_relay "OFF"
+            fi
+            ;;
+        *)
+            echo "$(date): Unknown mode: $new_mode (valid modes: auto, manual)"
+            ;;
+    esac
+}
+
+# Start MQTT subscriptions in background
 (
     while true; do
-        echo "$(date): Attempting to subscribe to MQTT topic: $MQTT_SUBSCRIBE_TOPIC"
+        echo "$(date): Starting MQTT subscriptions..."
         
-        mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" -t "$MQTT_SUBSCRIBE_TOPIC" -q "$MQTT_QOS" \
-        | while read -r message; do
-            if [[ -n "$message" ]]; then
-                echo "$(date): Received MQTT message: $message"
-                control_relay "$message"
-            fi
+        # Always subscribe to mode changes
+        mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
+            -t "$MQTT_MODE_TOPIC" -q "$MQTT_QOS" | \
+        while read -r topic message; do
+            handle_mode_change "$message"
         done
         
-        # If mosquitto_sub exits, wait and retry
-        echo "$(date): MQTT subscription lost. Retrying in 5 seconds..."
-        sleep 5
+        # Only subscribe to relay commands in manual mode
+        if [[ "$CURRENT_MODE" == "manual" ]]; then
+            echo "$(date): Subscribing to relay control in manual mode..."
+            mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
+                -t "$MQTT_RELAY_TOPIC" -q "$MQTT_QOS" | \
+            while read -r topic message; do
+                control_relay "$message"
+            done
+        fi
+        
+        sleep 5  # Wait before reconnecting if connection drops
     done
 ) &
 
@@ -190,7 +222,7 @@ while true; do
         # Calculate distance using bc for floating point arithmetic
         ULTRASONIC_DISTANCE=$(echo "scale=3; ($RAW_VALUE * 10) / 1303" | bc)
         
-        # Create JSON payload with timestamp
+        # Create JSON payload with timestamp and current mode
         TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
         JSON_PAYLOAD=$(cat << JSON_EOF
 {
@@ -198,13 +230,25 @@ while true; do
     "unit": "meters",
     "timestamp": "$TIMESTAMP",
     "sensor_id": "$MQTT_CLIENT_ID",
-    "raw_value": $RAW_VALUE
+    "raw_value": $RAW_VALUE,
+    "mode": "$CURRENT_MODE",
+    "threshold": $THRESHOLD
 }
 JSON_EOF
-)
+        )
         
         # Save data locally with timestamp
-        echo "$TIMESTAMP,$ULTRASONIC_DISTANCE" >> "$OUTPUT_FILE"
+        echo "$TIMESTAMP,$ULTRASONIC_DISTANCE,$CURRENT_MODE" >> "$OUTPUT_FILE"
+
+        # In auto mode, check threshold and control relay
+        if [[ "$CURRENT_MODE" == "auto" ]]; then
+            is_below_threshold=$(echo "$ULTRASONIC_DISTANCE < $THRESHOLD" | bc)
+            if [[ $is_below_threshold -eq 1 ]]; then
+                control_relay "ON"
+            else
+                control_relay "OFF"
+            fi
+        fi
 
         # Publish to MQTT broker with error handling
         if mosquitto_pub -h "$MQTT_BROKER" \
@@ -212,7 +256,7 @@ JSON_EOF
                         -t "$MQTT_TOPIC" \
                         -q "$MQTT_QOS" \
                         -m "$JSON_PAYLOAD" 2>/dev/null; then
-            echo "$(date): Distance: ${ULTRASONIC_DISTANCE}m (published successfully)"
+            echo "$(date): Distance: ${ULTRASONIC_DISTANCE}m, Mode: $CURRENT_MODE (published successfully)"
         else
             echo "$(date): Distance: ${ULTRASONIC_DISTANCE}m (MQTT publish failed)" >&2
         fi
@@ -320,9 +364,13 @@ show_usage_info() {
     echo "MQTT config:         ${_YELLOW}${SCRIPT_DIR}/mqtt_service.sh${_RESET}"
     echo
     echo "${_CYAN}=== MQTT Control ===${_RESET}"
-    echo "To control the relay, publish to:"
-    echo "${_YELLOW}mosquitto_pub -h [broker] -t [subscribe_topic] -m \"ON\"${_RESET}"
-    echo "${_YELLOW}mosquitto_pub -h [broker] -t [subscribe_topic] -m \"OFF\"${_RESET}"
+    echo "To change mode:"
+    echo "${_YELLOW}mosquitto_pub -h [broker] -t [mode_topic] -m \"auto\"${_RESET}"
+    echo "${_YELLOW}mosquitto_pub -h [broker] -t [mode_topic] -m \"manual\"${_RESET}"
+    echo
+    echo "To control relay (only works in manual mode):"
+    echo "${_YELLOW}mosquitto_pub -h [broker] -t [relay_topic] -m \"ON\"${_RESET}"
+    echo "${_YELLOW}mosquitto_pub -h [broker] -t [relay_topic] -m \"OFF\"${_RESET}"
     echo
 }
 
