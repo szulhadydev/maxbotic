@@ -15,7 +15,7 @@ export MQTT_CLIENT_ID="${MQTT_CLIENT_ID:-cm4-1}"
 MQTT_MODE_TOPIC="control/mode"
 
 # Default mode (can be overridden at runtime via MQTT)
-MODE="AUTO"
+CURRENT_MODE="AUTO"
 
 # Distance threshold (meters) for triggering relay in AUTO mode
 DISTANCE_THRESHOLD=5.0
