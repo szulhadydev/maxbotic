@@ -157,7 +157,7 @@ echo "AUTO" > /tmp/current_mode
 CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
 
 # Default mode is AUTO
-echo "AUTO" > /tmp/current_threshold
+echo "5.0" > /tmp/current_threshold
 CURRENT_THRESHOLD=$(cat /tmp/current_mode 2>/dev/null || echo "5.0")
 
 echo "Sensor: $SENSOR_DIR"
