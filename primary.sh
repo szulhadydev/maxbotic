@@ -182,15 +182,16 @@ control_relay() {
 
 # Start MQTT subscription in background with retry on failure
 # Start MQTT subscription in background for control and mode
+# Start MQTT subscription in background for control and mode with retry
 (
-    mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
+    until mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
         -t "$MQTT_SUBSCRIBE_TOPIC" \
         -t "$MQTT_MODE_TOPIC" \
-        -q "$MQTT_QOS" -v \
-    | while read -r full_message; do
+        -q "$MQTT_QOS" -v | while read -r full_message; do
+
         topic=$(cut -d' ' -f1 <<< "$full_message")
         message=$(cut -d' ' -f2- <<< "$full_message")
-        
+
         if [[ "$topic" == "$MQTT_MODE_TOPIC" ]]; then
             if [[ "$message" =~ ^(AUTO|MANUAL)$ ]]; then
                 echo "$message" > /tmp/current_mode
@@ -199,7 +200,6 @@ control_relay() {
                 echo "$(date): Invalid mode received: $message"
             fi
         elif [[ "$topic" == "$MQTT_SUBSCRIBE_TOPIC" ]]; then
-
             CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
             if [[ "$CURRENT_MODE" == "MANUAL" ]]; then
                 echo "$(date): MANUAL mode - received relay command: $message"
@@ -208,6 +208,11 @@ control_relay() {
                 echo "$(date): AUTO mode - ignoring manual command: $message"
             fi
         fi
+
+    done
+    do
+        echo "$(date): mosquitto_sub crashed or disconnected. Retrying in 5 seconds..." >&2
+        sleep 5
     done
 ) &
 
