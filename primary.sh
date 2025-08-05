@@ -281,8 +281,9 @@ create_systemd_service() {
 [Unit]
 Description=Maxbotic Ultrasonic Sensor Service
 Documentation=man:ultrasonic-sensor(1)
-After=network-online.target
+After=network-online.target mosquitto.service
 Wants=network-online.target
+Requires=mosquitto.service
 
 
 [Service]
