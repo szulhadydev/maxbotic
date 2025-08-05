@@ -189,12 +189,12 @@ control_relay() {
         if [[ "$topic" == "$MQTT_MODE_TOPIC" ]]; then
             if [[ "$message" =~ ^(AUTO|MANUAL)$ ]]; then
                 CURRENT_MODE="$message"
-                echo "$(date): Switched mode to: CURRENT_MODE"
+                echo "$(date): Switched mode to: $CURRENT_MODE"
             else
                 echo "$(date): Invalid mode received: $message"
             fi
         elif [[ "$topic" == "$MQTT_SUBSCRIBE_TOPIC" ]]; then
-            if [[ "CURRENT_MODE" == "MANUAL" ]]; then
+            if [[ "$CURRENT_MODE" == "MANUAL" ]]; then
                 echo "$(date): MANUAL mode - received relay command: $message"
                 control_relay "$message"
             else
