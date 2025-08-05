@@ -199,7 +199,7 @@ control_relay() {
                 echo "$(date): Invalid mode received: $message"
             fi
         elif [[ "$topic" == "$MQTT_SUBSCRIBE_TOPIC" ]]; then
-        
+
             CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
             if [[ "$CURRENT_MODE" == "MANUAL" ]]; then
                 echo "$(date): MANUAL mode - received relay command: $message"
@@ -278,8 +278,9 @@ create_systemd_service() {
 [Unit]
 Description=Maxbotic Ultrasonic Sensor Service
 Documentation=man:ultrasonic-sensor(1)
-After=network.target mosquitto.service
-Wants=mosquitto.service
+After=network-online.target
+Wants=network-online.target
+
 
 [Service]
 Type=simple
