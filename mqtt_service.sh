@@ -18,7 +18,7 @@ export MQTT_MODE_TOPIC="${MQTT_MODE_TOPIC:-dtonggang/ultrasonic-01/mode/control}
 export MQTT_THRESHOLD_TOPIC="${MQTT_THRESHOLD_TOPIC:-dtonggang/ultrasonic-01/threshold/set}"
 
 # Add new MQTT topic to reboot pi 
-export MQTT_REBOOT_TOPIC="${MQTT_REBOOT_TOPIC:-dtonggang/ultrasonic-01/reboot/control}"
+export MQTT_REBOOT_TOPIC="${MQTT_REBOOT_TOPIC:-dtonggang/ultrasonic-01/reboot}"
 
 # Default mode (can be overridden at runtime via MQTT)
 CURRENT_MODE="AUTO"
