@@ -202,9 +202,9 @@ JSON_EOF
 
         TRIGGER_SIREN=0
 
-        if [[ "$is_below_threshold" -eq 1 ]]; then
-            TRIGGER_SIREN=1
-        fi
+        # if [[ "$is_below_threshold" -eq 1 ]]; then
+        #     TRIGGER_SIREN=1
+        # fi
 
         # Handle MQTT override
         if [[ "$OVERRIDE_COMMAND" == "ON" ]]; then
