@@ -199,6 +199,7 @@ control_relay() {
                 echo "$(date): Invalid mode received: $message"
             fi
         elif [[ "$topic" == "$MQTT_SUBSCRIBE_TOPIC" ]]; then
+        
             CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
             if [[ "$CURRENT_MODE" == "MANUAL" ]]; then
                 echo "$(date): MANUAL mode - received relay command: $message"
