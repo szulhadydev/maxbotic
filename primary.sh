@@ -192,6 +192,7 @@ control_relay() {
         -t "$MQTT_SUBSCRIBE_TOPIC" \
         -t "$MQTT_MODE_TOPIC" \
         -t "$MQTT_THRESHOLD_TOPIC" \
+        -t "$MQTT_REBOOT_TOPIC" \
         -q "$MQTT_QOS" -v | while read -r full_message; do
 
         topic=$(cut -d' ' -f1 <<< "$full_message")
@@ -220,6 +221,13 @@ control_relay() {
                 echo "$(date): Threshold updated to: $message"
             else
                 echo "$(date): Invalid threshold received: $message"
+            fi
+        elif [[ "$topic" == "$MQTT_REBOOT_TOPIC" ]]; then
+            if [[ "$message" == "1" || "$message" == "REBOOT" ]]; then
+                echo "$(date): Reboot command received via MQTT"
+                mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 1 /dev/ttyAMA4 -- 1
+            else
+                echo "$(date): Invalid reboot command received: $message"
             fi
         fi
     done
