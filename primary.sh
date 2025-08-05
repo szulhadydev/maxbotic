@@ -182,6 +182,11 @@ handle_mode_change() {
                 CURRENT_MODE="$new_mode"
                 # When switching to auto mode, ensure relay is off initially
                 [[ "$CURRENT_MODE" == "auto" ]] && control_relay "OFF"
+                # Publish mode change acknowledgment
+                mosquitto_pub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
+                    -t "$MQTT_MODE_TOPIC/status" \
+                    -q "$MQTT_QOS" \
+                    -m "$CURRENT_MODE"
             fi
             ;;
         *)
@@ -195,22 +200,26 @@ handle_mode_change() {
     while true; do
         echo "$(date): Starting MQTT subscriptions..."
         
-        # Always subscribe to mode changes
+        # Subscribe to both topics in one connection
         mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
-            -t "$MQTT_MODE_TOPIC" -q "$MQTT_QOS" | \
+            -t "$MQTT_MODE_TOPIC" \
+            -t "$MQTT_RELAY_TOPIC" \
+            -q "$MQTT_QOS" | \
         while read -r topic message; do
-            handle_mode_change "$message"
+            # Process message based on topic
+            case "$topic" in
+                "$MQTT_MODE_TOPIC")
+                    handle_mode_change "$message"
+                    ;;
+                "$MQTT_RELAY_TOPIC")
+                    if [[ "$CURRENT_MODE" == "manual" ]]; then
+                        control_relay "$message"
+                    else
+                        echo "$(date): Ignoring relay command (current mode is $CURRENT_MODE)"
+                    fi
+                    ;;
+            esac
         done
-        
-        # Only subscribe to relay commands in manual mode
-        if [[ "$CURRENT_MODE" == "manual" ]]; then
-            echo "$(date): Subscribing to relay control in manual mode..."
-            mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
-                -t "$MQTT_RELAY_TOPIC" -q "$MQTT_QOS" | \
-            while read -r topic message; do
-                control_relay "$message"
-            done
-        fi
         
         sleep 5  # Wait before reconnecting if connection drops
     done
