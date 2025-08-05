@@ -218,6 +218,8 @@ while true; do
         # Calculate distance using bc for floating point arithmetic
         ULTRASONIC_DISTANCE=$(echo "scale=3; ($RAW_VALUE * 10) / 1303" | bc)
         
+        # Read current mode from shared file
+        CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
         # Create JSON payload with timestamp
         TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
         JSON_PAYLOAD=$(cat << JSON_EOF
@@ -226,7 +228,8 @@ while true; do
     "unit": "meters",
     "timestamp": "$TIMESTAMP",
     "sensor_id": "$MQTT_CLIENT_ID",
-    "raw_value": $RAW_VALUE
+    "raw_value": $RAW_VALUE,
+    "mode": "$CURRENT_MODE"
 }
 JSON_EOF
         )
