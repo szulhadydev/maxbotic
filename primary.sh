@@ -154,6 +154,7 @@ echo "Starting ultrasonic sensor monitoring..."
 
 # Default mode is AUTO
 echo "AUTO" > /tmp/current_mode
+CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
 
 echo "Sensor: $SENSOR_DIR"
 echo "MQTT Broker: $MQTT_BROKER:$MQTT_PORT"
@@ -198,6 +199,7 @@ control_relay() {
                 echo "$(date): Invalid mode received: $message"
             fi
         elif [[ "$topic" == "$MQTT_SUBSCRIBE_TOPIC" ]]; then
+            CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
             if [[ "$CURRENT_MODE" == "MANUAL" ]]; then
                 echo "$(date): MANUAL mode - received relay command: $message"
                 control_relay "$message"
