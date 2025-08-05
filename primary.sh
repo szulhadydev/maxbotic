@@ -198,7 +198,7 @@ JSON_EOF
         # 🚨 RELAY TRIGGER BASED ON DISTANCE
         # ==============================
         THRESHOLD=5.0  # meters
-        is_below_threshold=$(echo "$ULTRASONIC_DISTANCE < $THRESHOLD" | bc)
+        is_below_threshold=$(echo "$ULTRASONIC_DISTANCE > $THRESHOLD" | bc)
 
         TRIGGER_SIREN=0
 
