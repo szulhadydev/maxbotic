@@ -151,6 +151,10 @@ OUTPUT_DIR="$(dirname "$OUTPUT_FILE")"
 [[ ! -d "$OUTPUT_DIR" ]] && mkdir -p "$OUTPUT_DIR"
 
 echo "Starting ultrasonic sensor monitoring..."
+
+# Default mode is AUTO
+echo "AUTO" > /tmp/current_mode
+
 echo "Sensor: $SENSOR_DIR"
 echo "MQTT Broker: $MQTT_BROKER:$MQTT_PORT"
 echo "Publish Topic: $MQTT_TOPIC"
@@ -188,8 +192,8 @@ control_relay() {
         
         if [[ "$topic" == "$MQTT_MODE_TOPIC" ]]; then
             if [[ "$message" =~ ^(AUTO|MANUAL)$ ]]; then
-                CURRENT_MODE="$message"
-                echo "$(date): Switched mode to: $CURRENT_MODE"
+                echo "$message" > /tmp/current_mode
+                echo "$(date): Switched mode to: $message"
             else
                 echo "$(date): Invalid mode received: $message"
             fi
@@ -239,8 +243,8 @@ JSON_EOF
         fi
 
         # Only perform automatic control if in AUTO mode
+        CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
         if [[ $CURRENT_MODE == "AUTO" ]]; then
-            if (( $(echo "$ULTRASONIC_DISTANCE < $DISTANCE_THRESHOLD" | bc -l) )); then
                 echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE below threshold ($DISTANCE_THRESHOLD), triggering relay ON"
                 control_relay "ON"
             else
