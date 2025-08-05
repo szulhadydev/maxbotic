@@ -205,6 +205,7 @@ control_relay() {
 ) &
 
 # Continuous measurement loop
+# Continuous measurement loop
 while true; do
     if RAW_VALUE=$(cat "$SENSOR_DIR/in_voltage1_raw" 2>/dev/null); then
         # Calculate distance using bc for floating point arithmetic
@@ -221,7 +222,7 @@ while true; do
     "raw_value": $RAW_VALUE
 }
 JSON_EOF
-)
+        )
         
         # Save data locally with timestamp
         echo "$TIMESTAMP,$ULTRASONIC_DISTANCE" >> "$OUTPUT_FILE"
@@ -237,6 +238,7 @@ JSON_EOF
             echo "$(date): Distance: ${ULTRASONIC_DISTANCE}m (MQTT publish failed)" >&2
         fi
 
+        # Only perform automatic control if in AUTO mode
         if [[ "$CURRENT_MODE" == "AUTO" ]]; then
             if (( $(echo "$ULTRASONIC_DISTANCE < $DISTANCE_THRESHOLD" | bc -l) )); then
                 echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE below threshold ($DISTANCE_THRESHOLD), triggering relay ON"
