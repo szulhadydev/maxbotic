@@ -76,6 +76,8 @@ check_dependencies() {
     fi
     
     log_success "All dependencies satisfied"
+ 
+
 }
 
 # Load and validate MQTT configuration
@@ -92,6 +94,8 @@ load_mqtt_config() {
         log_error "MQTT configuration file not found: ${SCRIPT_DIR}/mqtt_service.sh"
         exit 1
     fi
+    CURRENT_MODE="$MODE"
+    # DISTANCE_THRESHOLD=${DISTANCE_THRESHOLD:-1.0}  # fallback to 1.0 meters
 }
 
 # Create startup script
@@ -166,21 +170,31 @@ control_relay() {
 }
 
 # Start MQTT subscription in background with retry on failure
+# Start MQTT subscription in background for control and mode
 (
-    while true; do
-        echo "$(date): Attempting to subscribe to MQTT topic: $MQTT_SUBSCRIBE_TOPIC"
+    mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
+        -t "$MQTT_SUBSCRIBE_TOPIC" \
+        -t "$MQTT_MODE_TOPIC" \
+        -q "$MQTT_QOS" -v \
+    | while read -r full_message; do
+        topic=$(cut -d' ' -f1 <<< "$full_message")
+        message=$(cut -d' ' -f2- <<< "$full_message")
         
-        mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" -t "$MQTT_SUBSCRIBE_TOPIC" -q "$MQTT_QOS" \
-        | while read -r message; do
-            if [[ -n "$message" ]]; then
-                echo "$(date): Received MQTT message: $message"
-                control_relay "$message"
+        if [[ "$topic" == "$MQTT_MODE_TOPIC" ]]; then
+            if [[ "$message" =~ ^(AUTO|MANUAL)$ ]]; then
+                CURRENT_MODE="$message"
+                echo "$(date): Switched mode to: $CURRENT_MODE"
+            else
+                echo "$(date): Invalid mode received: $message"
             fi
-        done
-        
-        # If mosquitto_sub exits, wait and retry
-        echo "$(date): MQTT subscription lost. Retrying in 5 seconds..."
-        sleep 5
+        elif [[ "$topic" == "$MQTT_SUBSCRIBE_TOPIC" ]]; then
+            if [[ "$CURRENT_MODE" == "MANUAL" ]]; then
+                echo "$(date): MANUAL mode - received relay command: $message"
+                control_relay "$message"
+            else
+                echo "$(date): AUTO mode - ignoring manual command: $message"
+            fi
+        fi
     done
 ) &
 
