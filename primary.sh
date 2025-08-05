@@ -39,7 +39,7 @@ load_mqtt_config() {
     exit 1
   fi
   source "$MQTT_CONFIG"
-  if [[ -z "${MQTT_BROKER:-}" || -z "${MQTT_PORT:-}" || -z "${MQTT_TOPIC:-}"]]; then
+  if [[ -z "${MQTT_BROKER:-}" || -z "${MQTT_PORT:-}" || -z "${MQTT_TOPIC:-}" ]]; then
     log_error "Missing required MQTT config variables."
     exit 1
   fi
