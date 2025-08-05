@@ -94,7 +94,10 @@ load_mqtt_config() {
         log_error "MQTT configuration file not found: ${SCRIPT_DIR}/mqtt_service.sh"
         exit 1
     fi
-    CURRENT_MODE="$CURRENT_MODE"
+    # Initialize mode (default to AUTO if not set)
+    CURRENT_MODE="${CURRENT_MODE:-AUTO}"
+    echo "Initialized mode: $CURRENT_MODE"
+
     # DISTANCE_THRESHOLD=${DISTANCE_THRESHOLD:-1.0}  # fallback to 1.0 meters
 }
 
@@ -169,7 +172,7 @@ control_relay() {
     esac
 }
 
-# Start MQTT subscription in background with retry on failure
+
 # Start MQTT subscription in background for control and mode
 (
     mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
