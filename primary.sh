@@ -94,7 +94,7 @@ load_mqtt_config() {
         log_error "MQTT configuration file not found: ${SCRIPT_DIR}/mqtt_service.sh"
         exit 1
     fi
-    CURRENT_MODE="$CURRENT_MODE"
+    # CURRENT_MODE="$CURRENT_MODE"
     # DISTANCE_THRESHOLD=${DISTANCE_THRESHOLD:-1.0}  # fallback to 1.0 meters
 }
 
@@ -182,7 +182,7 @@ control_relay() {
         
         if [[ "$topic" == "$MQTT_MODE_TOPIC" ]]; then
             if [[ "$message" =~ ^(AUTO|MANUAL)$ ]]; then
-                CURRENT_MODE="$message"
+                $CURRENT_MODE="$message"
                 echo "$(date): Switched mode to: $CURRENT_MODE"
             else
                 echo "$(date): Invalid mode received: $message"
