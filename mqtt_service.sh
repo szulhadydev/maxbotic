@@ -18,7 +18,7 @@ MQTT_MODE_TOPIC="control/mode"
 MODE="AUTO"
 
 # Distance threshold (meters) for triggering relay in AUTO mode
-DISTANCE_THRESHOLD=1.0
+DISTANCE_THRESHOLD=5.0
 
 # Optional MQTT Authentication (uncomment and set if needed)
 # export MQTT_USERNAME="your_username"

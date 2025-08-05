@@ -230,6 +230,16 @@ JSON_EOF
         else
             echo "$(date): Distance: ${ULTRASONIC_DISTANCE}m (MQTT publish failed)" >&2
         fi
+
+        if [[ "$CURRENT_MODE" == "AUTO" ]]; then
+            if (( $(echo "$ULTRASONIC_DISTANCE < $DISTANCE_THRESHOLD" | bc -l) )); then
+                echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE below threshold ($DISTANCE_THRESHOLD), triggering relay ON"
+                control_relay "ON"
+            else
+                echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE above threshold, triggering relay OFF"
+                control_relay "OFF"
+            fi
+        fi
         
     else
         echo "$(date): ERROR: Failed to read sensor data from $SENSOR_DIR/in_voltage1_raw" >&2
