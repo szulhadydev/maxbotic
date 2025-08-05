@@ -145,6 +145,24 @@ echo "MQTT Broker: $MQTT_BROKER:$MQTT_PORT"
 echo "Topic: $MQTT_TOPIC"
 echo "Measurement interval: ${MEASUREMENT_INTERVAL}s"
 
+
+# Background process to listen for relay control MQTT messages
+mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" -t "dtonggang/ultrasonic-01/relay/control" | while read -r message; do
+    case "$message" in
+        "on")
+            echo "$(date): Received 'on' command. Turning relay ON."
+            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
+            ;;
+        "off")
+            echo "$(date): Received 'off' command. Turning relay OFF."
+            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
+            ;;
+        *)
+            echo "$(date): Unknown MQTT command: $message" >&2
+            ;;
+    esac
+done &
+
 # Continuous measurement loop
 while true; do
     if RAW_VALUE=$(cat "$SENSOR_DIR/in_voltage1_raw" 2>/dev/null); then
@@ -168,18 +186,18 @@ JSON_EOF
         # Save data locally with timestamp
         echo "$TIMESTAMP,$ULTRASONIC_DISTANCE" >> "$OUTPUT_FILE"
 
-        THRESHOLD=5.0
-        is_below_threshold=$(echo "$ULTRASONIC_DISTANCE < $THRESHOLD" | bc)
-        if [[ $is_below_threshold -eq 1 ]]; then
-            # Turn on the relay if distance is below threshold
-            # echo "$(date): Distance: ${ULTRASONIC_DISTANCE}m (below threshold, publishing to MQTT)"
-            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
-        else
-            # Turn off the relay if distance is above threshold
-            # echo "$(date): Distance: ${ULTRASONIC_DISTANCE}m (above threshold, not publishing)"
-            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
-            continue
-        fi
+        # THRESHOLD=5.0
+        # is_below_threshold=$(echo "$ULTRASONIC_DISTANCE < $THRESHOLD" | bc)
+        # if [[ $is_below_threshold -eq 1 ]]; then
+        #     # Turn on the relay if distance is below threshold
+        #     # echo "$(date): Distance: ${ULTRASONIC_DISTANCE}m (below threshold, publishing to MQTT)"
+        #     mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
+        # else
+        #     # Turn off the relay if distance is above threshold
+        #     # echo "$(date): Distance: ${ULTRASONIC_DISTANCE}m (above threshold, not publishing)"
+        #     mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
+        #     continue
+        # fi
         
         # Publish to MQTT broker with error handling
         if mosquitto_pub -h "$MQTT_BROKER" \
