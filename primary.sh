@@ -165,14 +165,22 @@ control_relay() {
     esac
 }
 
-# Start MQTT subscription in background
+# Start MQTT subscription in background with retry on failure
 (
     while true; do
-        echo "$(date): Starting MQTT subscription..."
-        mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" -t "$MQTT_SUBSCRIBE_TOPIC" -q "$MQTT_QOS" | while read -r message; do
-            control_relay "$message"
+        echo "$(date): Attempting to subscribe to MQTT topic: $MQTT_SUBSCRIBE_TOPIC"
+        
+        mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" -t "$MQTT_SUBSCRIBE_TOPIC" -q "$MQTT_QOS" \
+        | while read -r message; do
+            if [[ -n "$message" ]]; then
+                echo "$(date): Received MQTT message: $message"
+                control_relay "$message"
+            fi
         done
-        sleep 5  # Wait before reconnecting if connection drops
+        
+        # If mosquitto_sub exits, wait and retry
+        echo "$(date): MQTT subscription lost. Retrying in 5 seconds..."
+        sleep 5
     done
 ) &
 
