@@ -8,6 +8,7 @@
 export MQTT_BROKER="${MQTT_BROKER:-xx.xxx.xxx}"
 export MQTT_PORT="${MQTT_PORT:-1883}"
 export MQTT_TOPIC="${MQTT_TOPIC:-dtonggang/ultrasonic-01}"
+export MQTT_SUBSCRIBE_TOPIC="${MQTT_SUBSCRIBE_TOPIC:-dtonggang/ultrasonic-01/relay/control}"
 export MQTT_CLIENT_ID="${MQTT_CLIENT_ID:-cm4-1}"
 
 # Optional MQTT Authentication (uncomment and set if needed)
