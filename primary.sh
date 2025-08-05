@@ -213,8 +213,6 @@ control_relay() {
             else
                 echo "$(date): AUTO mode - ignoring manual command: $message"
             fi
-        #fi
-
         elif [[ "$topic" == "$MQTT_THRESHOLD_TOPIC" ]]; then
             if [[ "$message" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
                 echo "$message" > /tmp/current_threshold
