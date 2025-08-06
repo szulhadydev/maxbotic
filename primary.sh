@@ -279,16 +279,20 @@ JSON_EOF
 
             CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "$DISTANCE_THRESHOLD")
 
-            if (( $(echo "$ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD" | bc -l) )); then
 
-
-            #if (( $(echo "$ULTRASONIC_DISTANCE < $DISTANCE_THRESHOLD" | bc #-l) )); then
-                echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE below threshold ($DISTANCE_THRESHOLD), triggering relay ON"
-                control_relay "ON"
-            else
-                echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE above threshold, triggering relay OFF"
-                control_relay "OFF"
-            fi
+             # Parse the distance and threshold from the JSON payload
+            DISTANCE_FROM_JSON=$(echo "$JSON_PAYLOAD" | jq -r '.distance')
+            if [[ -n "$DISTANCE_FROM_JSON" && -n "$THRESHOLD_FROM_JSON" ]]; then
+                  if (( $(echo "$DISTANCE_FROM_JSON < $THRESHOLD_FROM_JSON" | bc -l) )); then
+                      echo "$(date): AUTO mode - distance $DISTANCE_FROM_JSON below threshold ($THRESHOLD_FROM_JSON), triggering relay ON"
+                      control_relay "ON"
+                  else
+                      echo "$(date): AUTO mode - distance $DISTANCE_FROM_JSON above threshold, triggering relay OFF"
+                      control_relay "OFF"
+                  fi
+              else
+                  echo "$(date): ERROR - JSON missing distance or threshold fields"
+              fi
         fi
         
     else
