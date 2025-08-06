@@ -204,11 +204,27 @@ control_relay() {
         message=$(cut -d' ' -f2- <<< "$full_message")
 
         if [[ "$topic" == "$MQTT_MODE_TOPIC" ]]; then
-            if [[ "$message" =~ ^(AUTO|MANUAL)$ ]]; then
-                echo "$message" > /tmp/current_mode
-                echo "$(date): Switched mode to: $message"
+             if [[ "$message" =~ ^(AUTO|MANUAL)$ ]]; then
+        echo "$message" > /tmp/current_mode
+        echo "$(date): Switched mode to: $message"
+
+        if [[ "$message" == "AUTO" ]]; then
+            # Read latest distance and threshold
+            CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "5.0")
+            if RAW_VALUE=$(cat "$SENSOR_DIR/in_voltage1_raw" 2>/dev/null); then
+                ULTRASONIC_DISTANCE=$(echo "scale=3; ($RAW_VALUE * 10) / 1303" | bc)
+
+                if (( $(echo "$ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD" | bc -l) )); then
+                    echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD — relay ON"
+                    control_relay "ON"
+                    PREVIOUS_STATE="BELOW"
+                else
+                    echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE >= $CURRENT_THRESHOLD — relay OFF"
+                    control_relay "OFF"
+                    PREVIOUS_STATE="ABOVE"
+                fi
             else
-                echo "$(date): Invalid mode received: $message"
+                echo "$(date): AUTO mode - Failed to read sensor for immediate relay check" >&2
             fi
         elif [[ "$topic" == "$MQTT_SUBSCRIBE_TOPIC" ]]; then
             CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
