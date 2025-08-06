@@ -23,6 +23,8 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CURRENT_MODE="${CURRENT_MODE:-AUTO}"
 # echo "Initialized mode: $CURRENT_MODE"
 
+
+
 # Logging functions
 log_info() {
     echo "${_MAGENTA}[INFO]${_RESET} $1"
@@ -160,6 +162,9 @@ CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
 echo "5.0" > /tmp/current_threshold
 CURRENT_THRESHOLD=$(cat /tmp/current_mode 2>/dev/null || echo "5.0")
 
+# State tracking for relay logic
+PREVIOUS_STATE="UNKNOWN"
+
 echo "Sensor: $SENSOR_DIR"
 echo "MQTT Broker: $MQTT_BROKER:$MQTT_PORT"
 echo "Publish Topic: $MQTT_TOPIC"
@@ -237,53 +242,43 @@ control_relay() {
 
 # Continuous measurement loop
 # Continuous measurement loop
+# Sensor loop
 while true; do
     if RAW_VALUE=$(cat "$SENSOR_DIR/in_voltage1_raw" 2>/dev/null); then
-        # Calculate distance using bc for floating point arithmetic
         ULTRASONIC_DISTANCE=$(echo "scale=3; ($RAW_VALUE * 10) / 1303" | bc)
-        
-        # Read current mode from shared file
+
         CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
-        # Create JSON payload with timestamp
+        CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "5.0")
         TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
-JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \"unit\": \"meters\", \"timestamp\": \"$TIMESTAMP\", \"sensor_id\": \"$MQTT_CLIENT_ID\", \"raw_value\": $RAW_VALUE, \"mode\": \"$CURRENT_MODE\", \"threshold\": $CURRENT_THRESHOLD}"
-        
-        # Save data locally with timestamp
+
+        JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \"unit\": \"meters\", \"timestamp\": \"$TIMESTAMP\", \"sensor_id\": \"$MQTT_CLIENT_ID\", \"raw_value\": $RAW_VALUE, \"mode\": \"$CURRENT_MODE\", \"threshold\": $CURRENT_THRESHOLD}"
+
         echo "$TIMESTAMP,$ULTRASONIC_DISTANCE" >> "$OUTPUT_FILE"
 
-        # Publish to MQTT broker with error handling
-        if mosquitto_pub -h "$MQTT_BROKER" \
-                        -p "$MQTT_PORT" \
-                        -t "$MQTT_TOPIC" \
-                        -q "$MQTT_QOS" \
-                        -m "$JSON_PAYLOAD" 2>/dev/null; then
-            echo "$(date): Distance: ${ULTRASONIC_DISTANCE}m (published successfully)"
-        else
-            echo "$(date): Distance: ${ULTRASONIC_DISTANCE}m (MQTT publish failed)" >&2
-        fi
+        mosquitto_pub -h "$MQTT_BROKER" -p "$MQTT_PORT" -t "$MQTT_TOPIC" -q "$MQTT_QOS" -m "$JSON_PAYLOAD" \
+            && echo "$(date): Distance: $ULTRASONIC_DISTANCE (MQTT published)" \
+            || echo "$(date): MQTT publish failed" >&2
 
-        # Only perform automatic control if in AUTO mode
-        CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
-        if [[ $CURRENT_MODE == "AUTO" ]]; then
-
-            CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "$DISTANCE_THRESHOLD")
-
+        # AUTO mode distance threshold logic (with state change detection)
+        if [[ "$CURRENT_MODE" == "AUTO" ]]; then
             if (( $(echo "$ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD" | bc -l) )); then
-
-
-            #if (( $(echo "$ULTRASONIC_DISTANCE < $DISTANCE_THRESHOLD" | bc #-l) )); then
-                echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE below threshold ($DISTANCE_THRESHOLD), triggering relay ON"
-                control_relay "ON"
+                if [[ "$PREVIOUS_STATE" != "BELOW" ]]; then
+                    echo "$(date): Distance $ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD — relay ON"
+                    control_relay "ON"
+                    PREVIOUS_STATE="BELOW"
+                fi
             else
-                echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE above threshold, triggering relay OFF"
-                control_relay "OFF"
+                if [[ "$PREVIOUS_STATE" != "ABOVE" ]]; then
+                    echo "$(date): Distance $ULTRASONIC_DISTANCE >= $CURRENT_THRESHOLD — relay OFF"
+                    control_relay "OFF"
+                    PREVIOUS_STATE="ABOVE"
+                fi
             fi
         fi
-        
     else
-        echo "$(date): ERROR: Failed to read sensor data from $SENSOR_DIR/in_voltage1_raw" >&2
+        echo "$(date): ERROR reading sensor value from $SENSOR_DIR/in_voltage1_raw" >&2
     fi
-    
+
     sleep "$MEASUREMENT_INTERVAL"
 done
 EOF

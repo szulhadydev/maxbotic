@@ -7,18 +7,18 @@
 # MQTT Broker Configuration
 export MQTT_BROKER="${MQTT_BROKER:-xx.xxx.xxx}"
 export MQTT_PORT="${MQTT_PORT:-1883}"
-export MQTT_TOPIC="${MQTT_TOPIC:-dtonggang/ultrasonic-01}"
-export MQTT_SUBSCRIBE_TOPIC="${MQTT_SUBSCRIBE_TOPIC:-dtonggang/ultrasonic-01/relay/control}"
-export MQTT_CLIENT_ID="${MQTT_CLIENT_ID:-cm4-1}"
+export MQTT_CLIENT_ID="${MQTT_CLIENT_ID:-cm4-01}"
+export MQTT_TOPIC="${MQTT_TOPIC:-EA/data/cm4-01}"
+export MQTT_SUBSCRIBE_TOPIC=`${MQTT_SUBSCRIBE_TOPIC:-EA/${MQTT_CLIENT_ID}/relay/control}`
 
 # Add new MQTT topic for mode control
-export MQTT_MODE_TOPIC="${MQTT_MODE_TOPIC:-dtonggang/ultrasonic-01/mode/control}"
+export MQTT_MODE_TOPIC=`${MQTT_MODE_TOPIC:-EA/${MQTT_CLIENT_ID}/mode/control}`
 
 # Add new MQTT topic to set threshold 
-export MQTT_THRESHOLD_TOPIC="${MQTT_THRESHOLD_TOPIC:-dtonggang/ultrasonic-01/threshold/set}"
+export MQTT_THRESHOLD_TOPIC=`${EA/${MQTT_CLIENT_ID}/threshold/set}`
 
 # Add new MQTT topic to reboot pi 
-export MQTT_REBOOT_TOPIC="${MQTT_REBOOT_TOPIC:-dtonggang/ultrasonic-01/reboot}"
+export MQTT_REBOOT_TOPIC=`${MQTT_REBOOT_TOPIC:-EA/${MQTT_CLIENT_ID}/reboot}`
 
 # Default mode (can be overridden at runtime via MQTT)
 CURRENT_MODE="AUTO"
@@ -37,7 +37,7 @@ export MQTT_QOS="${MQTT_QOS:-2}"
 # Sensor Configuration
 export SENSOR_DIR="${SENSOR_DIR:-/sys/bus/iio/devices/iio:device0}"
 export OUTPUT_FILE="${OUTPUT_FILE:-/home/pi/ultrasonic.txt}"
-export MEASUREMENT_INTERVAL="${MEASUREMENT_INTERVAL:-2}"
+export MEASUREMENT_INTERVAL="${MEASUREMENT_INTERVAL:-5}"
 
 # Logging
 log_mqtt_info() {
