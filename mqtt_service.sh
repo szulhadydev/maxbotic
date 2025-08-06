@@ -9,16 +9,16 @@ export MQTT_BROKER="${MQTT_BROKER:-xx.xxx.xxx}"
 export MQTT_PORT="${MQTT_PORT:-1883}"
 export MQTT_CLIENT_ID="${MQTT_CLIENT_ID:-cm4-01}"
 export MQTT_TOPIC="${MQTT_TOPIC:-EA/data/cm4-01}"
-export MQTT_SUBSCRIBE_TOPIC=`${MQTT_SUBSCRIBE_TOPIC:-EA/${MQTT_CLIENT_ID}/relay/control}`
+export MQTT_SUBSCRIBE_TOPIC="${MQTT_SUBSCRIBE_TOPIC:-EA/${MQTT_CLIENT_ID}/relay/control}"
 
 # Add new MQTT topic for mode control
-export MQTT_MODE_TOPIC=`${MQTT_MODE_TOPIC:-EA/${MQTT_CLIENT_ID}/mode/control}`
+export MQTT_MODE_TOPIC="${MQTT_MODE_TOPIC:-EA/${MQTT_CLIENT_ID}/mode/control}"
 
 # Add new MQTT topic to set threshold 
-export MQTT_THRESHOLD_TOPIC=`${EA/${MQTT_CLIENT_ID}/threshold/set}`
+export MQTT_THRESHOLD_TOPIC="${EA/${MQTT_CLIENT_ID}/threshold/set}"
 
 # Add new MQTT topic to reboot pi 
-export MQTT_REBOOT_TOPIC=`${MQTT_REBOOT_TOPIC:-EA/${MQTT_CLIENT_ID}/reboot}`
+export MQTT_REBOOT_TOPIC="${MQTT_REBOOT_TOPIC:-EA/${MQTT_CLIENT_ID}/reboot}"
 
 # Default mode (can be overridden at runtime via MQTT)
 CURRENT_MODE="AUTO"
