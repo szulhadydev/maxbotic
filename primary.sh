@@ -251,7 +251,7 @@ while true; do
         CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "5.0")
         TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
 
-        JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \"unit\": \"meters\", \"timestamp\": \"$TIMESTAMP\", \"devEUI\": \"$MQTT_CLIENT_ID\",\"deviceType\":"ultrasonic", \"raw_value\": $RAW_VALUE, \"mode\": \"$CURRENT_MODE\", \"threshold\": $CURRENT_THRESHOLD}"
+        JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \"unit\": \"meters\", \"timestamp\": \"$TIMESTAMP\", \"devEUI\": \"$MQTT_CLIENT_ID\",\"deviceType\":\"ultrasonic\", \"raw_value\": $RAW_VALUE, \"mode\": \"$CURRENT_MODE\", \"threshold\": $CURRENT_THRESHOLD}"
 
         echo "$TIMESTAMP,$ULTRASONIC_DISTANCE" >> "$OUTPUT_FILE"
 
