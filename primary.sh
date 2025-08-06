@@ -246,16 +246,7 @@ while true; do
         CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
         # Create JSON payload with timestamp
         TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
-        JSON_PAYLOAD=$(cat << JSON_EOF
-{
-    "distance": $ULTRASONIC_DISTANCE,
-    "unit": "meters",
-    "timestamp": "$TIMESTAMP",
-    "sensor_id": "$MQTT_CLIENT_ID",
-    "raw_value": $RAW_VALUE,
-    "mode": "$CURRENT_MODE",
-    "threshold": "$CURRENT_THRESHOLD",
-}
+        JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \"unit\": \"meters\", \"timestamp\": \"$TIMESTAMP\", \"sensor_id\": \"$MQTT_CLIENT_ID\", \"raw_value\": $RAW_VALUE, \"mode\": \"$CURRENT_MODE\", \"threshold\": \"$CURRENT_THRESHOLD\"}"
 JSON_EOF
         )
         
