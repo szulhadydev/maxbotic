@@ -17,6 +17,19 @@ export MQTT_MODE_TOPIC="${MQTT_MODE_TOPIC:-EA/${MQTT_CLIENT_ID}/mode/control}"
 # Add new MQTT topic to set threshold 
 export MQTT_THRESHOLD_TOPIC="${MQTT_THRESHOLD_TOPIC:-EA/${MQTT_CLIENT_ID}/threshold/set}"
 
+
+
+# --- Multi-threshold Topics ---
+export MQTT_THRESHOLD_NORMAL_TOPIC="${MQTT_THRESHOLD_NORMAL_TOPIC:-EA/${MQTT_CLIENT_ID}/threshold/normal/set}"
+export MQTT_THRESHOLD_WARNING_TOPIC="${MQTT_THRESHOLD_WARNING_TOPIC:-EA/${MQTT_CLIENT_ID}/threshold/warning/set}"
+export MQTT_THRESHOLD_ALERT_TOPIC="${MQTT_THRESHOLD_ALERT_TOPIC:-EA/${MQTT_CLIENT_ID}/threshold/alert/set}"
+export MQTT_THRESHOLD_DANGER_TOPIC="${MQTT_THRESHOLD_DANGER_TOPI:-EA/${MQTT_CLIENT_ID}/threshold/danger/set}"
+# export MQTT_THRESHOLD_NORMAL_TOPIC="ultrasonic/threshold/normal"
+# export MQTT_THRESHOLD_WARNING_TOPIC="ultrasonic/threshold/warning"
+# export MQTT_THRESHOLD_ALERT_TOPIC="ultrasonic/threshold/alert"
+# export MQTT_THRESHOLD_DANGER_TOPIC="ultrasonic/threshold/danger"
+export MQTT_DEBUG_TOPIC_SIREN="${MQTT_DEBUG_TOPIC_SIREN:-EA/${MQTT_CLIENT_ID}/debug/siren}"
+
 # Add new MQTT topic to reboot pi 
 export MQTT_REBOOT_TOPIC="${MQTT_REBOOT_TOPIC:-EA/${MQTT_CLIENT_ID}/reboot}"
 

@@ -162,6 +162,18 @@ CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
 echo "5.0" > /tmp/current_threshold
 CURRENT_THRESHOLD=$(cat /tmp/current_mode 2>/dev/null || echo "5.0")
 
+
+# Initialize thresholds for 4 levels
+echo "1.5"  > /tmp/threshold_normal
+echo "3.0"  > /tmp/threshold_warning
+echo "5.0"  > /tmp/threshold_alert
+echo "8.0"  > /tmp/threshold_danger
+# echo "8.0"  > /tmp/threshold_normal
+# echo "5.0"  > /tmp/threshold_warning
+# echo "3.0"  > /tmp/threshold_alert
+# echo "1.5"  > /tmp/threshold_danger
+
+
 # State tracking for relay logic
 PREVIOUS_STATE="UNKNOWN"
 
@@ -172,22 +184,71 @@ echo "Subscribe Topic: $MQTT_SUBSCRIBE_TOPIC"
 echo "Measurement interval: ${MEASUREMENT_INTERVAL}s"
 
 # Function to control relay based on MQTT messages
-control_relay() {
-    local message="$1"
-    case "$message" in
-        "ON"|"1")
-            echo "$(date): Received command to turn relay ON"
-            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
-            ;;
-        "OFF"|"0")
-            echo "$(date): Received command to turn relay OFF"
+# control_relay() {
+#     local message="$1"
+#     case "$message" in
+#         "ON"|"1")
+#             echo "$(date): Received command to turn relay ON"
+#             mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
+#             ;;
+#         "OFF"|"0")
+#             echo "$(date): Received command to turn relay OFF"
+#             mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
+#             ;;
+#         *)
+#             echo "$(date): Received unknown relay command: $message"
+#             ;;
+#     esac
+# }
+
+# --- Relay Pattern Controller for multi-thresholds ---
+control_relay_pattern() {
+    local level="$1"
+    local status_msg=""
+    echo "$(date): Triggering siren pattern for level: $level"
+
+    case "$level" in
+        "NORMAL")
+            # Relay OFF
             mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
+            status_msg="SAFE - Relay OFF"
             ;;
-        *)
-            echo "$(date): Received unknown relay command: $message"
+        "WARNING")
+            # 1 short pulse
+            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
+            status_msg="WARNING - pulse"
+            sleep 0.5
+            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
+            status_msg="WARNING - off"
+            ;;
+        "ALERT")
+            # 3 quick pulses
+            for i in {1..3}; do
+                mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
+                status_msg="ALERT - pulse"
+                sleep 0.3
+                mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
+                status_msg="ALERT - off"
+                sleep 0.3
+            done
+            ;;
+        "DANGER")
+            # Continuous ON
+            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
+            status_msg="DANGER - pulse"
             ;;
     esac
+        # --- Publish MQTT Debug Info ---
+    local timestamp
+    timestamp=$(date +"%Y-%m-%dT%H:%M:%S")
+    local json_payload="{\"timestamp\":\"$timestamp\", \"siren_level\":\"$level\", \"status\":\"$status_msg\"}"
+
+    mosquitto_pub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
+        -t "$MQTT_DEBUG_TOPIC" -q "$MQTT_QOS" -m "$json_payload" \
+        && echo "$(date): [MQTT] Published siren debug: $json_payload" \
+        || echo "$(date): [MQTT] Failed to publish siren debug" >&2
 }
+
 
 # Start MQTT subscription in background with retry on failure
 # Start MQTT subscription in background for control and mode
@@ -197,6 +258,12 @@ control_relay() {
         -t "$MQTT_SUBSCRIBE_TOPIC" \
         -t "$MQTT_MODE_TOPIC" \
         -t "$MQTT_THRESHOLD_TOPIC" \
+
+        -t "$MQTT_THRESHOLD_NORMAL_TOPIC" \
+        -t "$MQTT_THRESHOLD_WARNING_TOPIC" \
+        -t "$MQTT_THRESHOLD_ALERT_TOPIC" \
+        -t "$MQTT_THRESHOLD_DANGER_TOPIC" \
+
         -t "$MQTT_REBOOT_TOPIC" \
         -q "$MQTT_QOS" -v | while read -r full_message; do
 
@@ -238,13 +305,21 @@ control_relay() {
             else
                 echo "$(date): AUTO mode - ignoring manual command: $message"
             fi
-        elif [[ "$topic" == "$MQTT_THRESHOLD_TOPIC" ]]; then
-            if [[ "$message" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-                echo "$message" > /tmp/current_threshold
-                echo "$(date): Threshold updated to: $message"
-            else
-                echo "$(date): Invalid threshold received: $message"
-            fi
+        elif [[ "$topic" == "$MQTT_THRESHOLD_NORMAL_TOPIC" ]]; then
+          echo "$message" > /tmp/threshold_normal && echo "$(date): NORMAL threshold updated to $message"
+        elif [[ "$topic" == "$MQTT_THRESHOLD_WARNING_TOPIC" ]]; then
+          echo "$message" > /tmp/threshold_warning && echo "$(date): WARNING threshold updated to $message"
+        elif [[ "$topic" == "$MQTT_THRESHOLD_ALERT_TOPIC" ]]; then
+          echo "$message" > /tmp/threshold_alert && echo "$(date): ALERT threshold updated to $message"
+        elif [[ "$topic" == "$MQTT_THRESHOLD_DANGER_TOPIC" ]]; then
+          echo "$message" > /tmp/threshold_danger && echo "$(date): DANGER threshold updated to $message"
+        # elif [[ "$topic" == "$MQTT_THRESHOLD_TOPIC" ]]; then
+        #     if [[ "$message" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+        #         echo "$message" > /tmp/current_threshold
+        #         echo "$(date): Threshold updated to: $message"
+        #     else
+        #         echo "$(date): Invalid threshold received: $message"
+        #     fi
         elif [[ "$topic" == "$MQTT_REBOOT_TOPIC" ]]; then
             if [[ "$message" == "1" || "$message" == "REBOOT" ]]; then
                 echo "$(date): Reboot command received via MQTT"
@@ -280,19 +355,43 @@ while true; do
             || echo "$(date): MQTT publish failed" >&2
 
         # AUTO mode distance threshold logic (with state change detection)
+        # if [[ "$CURRENT_MODE" == "AUTO" ]]; then
+        #     if (( $(echo "$ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD" | bc -l) )); then
+        #         if [[ "$PREVIOUS_STATE" != "BELOW" ]]; then
+        #             echo "$(date): Distance $ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD — relay ON"
+        #             control_relay "ON"
+        #             PREVIOUS_STATE="BELOW"
+        #         fi
+        #     else
+        #         if [[ "$PREVIOUS_STATE" != "ABOVE" ]]; then
+        #             echo "$(date): Distance $ULTRASONIC_DISTANCE >= $CURRENT_THRESHOLD — relay OFF"
+        #             control_relay "OFF"
+        #             PREVIOUS_STATE="ABOVE"
+        #         fi
+        #     fi
+        # fi
         if [[ "$CURRENT_MODE" == "AUTO" ]]; then
-            if (( $(echo "$ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD" | bc -l) )); then
-                if [[ "$PREVIOUS_STATE" != "BELOW" ]]; then
-                    echo "$(date): Distance $ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD — relay ON"
-                    control_relay "ON"
-                    PREVIOUS_STATE="BELOW"
-                fi
+            TH_NORMAL=$(cat /tmp/threshold_normal)
+            TH_WARNING=$(cat /tmp/threshold_warning)
+            TH_ALERT=$(cat /tmp/threshold_alert)
+            TH_DANGER=$(cat /tmp/threshold_danger)
+
+            if (( $(echo "$ULTRASONIC_DISTANCE <= $TH_DANGER" | bc -l) )); then
+                LEVEL="DANGER"
+            elif (( $(echo "$ULTRASONIC_DISTANCE <= $TH_ALERT" | bc -l) )); then
+                LEVEL="ALERT"
+            elif (( $(echo "$ULTRASONIC_DISTANCE <= $TH_WARNING" | bc -l) )); then
+                LEVEL="WARNING"
+            elif (( $(echo "$ULTRASONIC_DISTANCE <= $TH_NORMAL" | bc -l) )); then
+                LEVEL="NORMAL"
             else
-                if [[ "$PREVIOUS_STATE" != "ABOVE" ]]; then
-                    echo "$(date): Distance $ULTRASONIC_DISTANCE >= $CURRENT_THRESHOLD — relay OFF"
-                    control_relay "OFF"
-                    PREVIOUS_STATE="ABOVE"
-                fi
+                LEVEL="SAFE"
+            fi
+
+            if [[ "$LEVEL" != "$PREVIOUS_STATE" ]]; then
+                echo "$(date): Level changed to $LEVEL (distance: $ULTRASONIC_DISTANCE)"
+                control_relay_pattern "$LEVEL"
+                PREVIOUS_STATE="$LEVEL"
             fi
         fi
     else
