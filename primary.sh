@@ -346,7 +346,7 @@ control_relay_pattern() {
 # Continuous measurement loop
 # Sensor loop
 while true; do
-    if RAW_VALUE=$(cat "$SENSOR_DIR/in_voltage1_raw" 2>/dev/null); then
+    # if RAW_VALUE=$(cat "$SENSOR_DIR/in_voltage1_raw" 2>/dev/null); then
         ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
         # ULTRASONIC_DISTANCE=$(echo "scale=3; ($RAW_VALUE * 10) / 1303" | bc)
 
@@ -355,10 +355,10 @@ while true; do
         TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
 
         # Multi-stage thresholds
-        THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null || echo "2.5")
-        THRESHOLD_SAFE=$(cat /tmp/threshold_safe 2>/dev/null || echo "2.0")
-        THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "1.5")
-        THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null || echo "1.0")
+        THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null)
+        THRESHOLD_SAFE=$(cat /tmp/threshold_safe 2>/dev/null)
+        THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null)
+        THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null)
 
         # JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \"unit\": \"meters\", \"timestamp\": \"$TIMESTAMP\", \"devEUI\": \"$MQTT_CLIENT_ID\",\"deviceType\":\"ultrasonic\", \"raw_value\": $RAW_VALUE, \"mode\": \"$CURRENT_MODE\", \"threshold\": $CURRENT_THRESHOLD}"
 
@@ -412,73 +412,9 @@ while true; do
                 PREVIOUS_STATE="$LEVEL"
             fi
         fi
-    else
-        echo "$(date): ERROR reading sensor value from $SENSOR_DIR/in_voltage1_raw" >&2
-        ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
-        # ULTRASONIC_DISTANCE=$(echo "scale=3; ($RAW_VALUE * 10) / 1303" | bc)
-
-        CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
-        CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "5.0")
-        TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
-
-        # Multi-stage thresholds
-        THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null || echo "2.5")
-        THRESHOLD_SAFE=$(cat /tmp/threshold_safe 2>/dev/null || echo "2.0")
-        THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "1.5")
-        THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null || echo "1.0")
-
-        # JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \"unit\": \"meters\", \"timestamp\": \"$TIMESTAMP\", \"devEUI\": \"$MQTT_CLIENT_ID\",\"deviceType\":\"ultrasonic\", \"raw_value\": $RAW_VALUE, \"mode\": \"$CURRENT_MODE\", \"threshold\": $CURRENT_THRESHOLD}"
-
-        JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \"unit\": \"meters\", \"timestamp\": \"$TIMESTAMP\", \"devEUI\": \"$MQTT_CLIENT_ID\", \"deviceType\": \"ultrasonic\", \"raw_value\": $RAW_VALUE, \"mode\": \"$CURRENT_MODE\", \"threshold_normal\": $THRESHOLD_NORMAL, \"threshold_safe\": $THRESHOLD_SAFE, \"threshold_warning\": $THRESHOLD_WARNING, \"threshold_danger\": $THRESHOLD_DANGER}"
-
-
-
-        echo "$TIMESTAMP,$ULTRASONIC_DISTANCE" >> "$OUTPUT_FILE"
-
-        mosquitto_pub -h "$MQTT_BROKER" -p "$MQTT_PORT" -t "$MQTT_TOPIC" -q "$MQTT_QOS" -m "$JSON_PAYLOAD" \
-            && echo "$(date): Distance: $ULTRASONIC_DISTANCE (MQTT published)" \
-            || echo "$(date): MQTT publish failed" >&2
-
-        # AUTO mode distance threshold logic (with state change detection)
-        # if [[ "$CURRENT_MODE" == "AUTO" ]]; then
-        #     if (( $(echo "$ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD" | bc -l) )); then
-        #         if [[ "$PREVIOUS_STATE" != "BELOW" ]]; then
-        #             echo "$(date): Distance $ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD — relay ON"
-        #             control_relay "ON"
-        #             PREVIOUS_STATE="BELOW"
-        #         fi
-        #     else
-        #         if [[ "$PREVIOUS_STATE" != "ABOVE" ]]; then
-        #             echo "$(date): Distance $ULTRASONIC_DISTANCE >= $CURRENT_THRESHOLD — relay OFF"
-        #             control_relay "OFF"
-        #             PREVIOUS_STATE="ABOVE"
-        #         fi
-        #     fi
-        # fi
-        if [[ "$CURRENT_MODE" == "AUTO" ]]; then
-            TH_NORMAL=$(cat /tmp/threshold_normal)
-            TH_WARNING=$(cat /tmp/threshold_warning)
-            TH_ALERT=$(cat /tmp/threshold_alert)
-            TH_DANGER=$(cat /tmp/threshold_danger)
-
-            if (( $(echo "$ULTRASONIC_DISTANCE <= $TH_DANGER" | bc -l) )); then
-                LEVEL="DANGER"
-            elif (( $(echo "$ULTRASONIC_DISTANCE <= $TH_ALERT" | bc -l) )); then
-                LEVEL="ALERT"
-            elif (( $(echo "$ULTRASONIC_DISTANCE <= $TH_WARNING" | bc -l) )); then
-                LEVEL="WARNING"
-            elif (( $(echo "$ULTRASONIC_DISTANCE <= $TH_NORMAL" | bc -l) )); then
-                LEVEL="NORMAL"
-            else
-                LEVEL="SAFE"
-            fi
-
-            if [[ "$LEVEL" != "$PREVIOUS_STATE" ]]; then
-                echo "$(date): Level changed to $LEVEL (distance: $ULTRASONIC_DISTANCE)"
-                control_relay_pattern "$LEVEL"
-                PREVIOUS_STATE="$LEVEL"
-            fi
-        fi
+    # else
+    #     echo "$(date): ERROR reading sensor value from $SENSOR_DIR/in_voltage1_raw" >&2
+        
     fi
 
     sleep "$MEASUREMENT_INTERVAL"
