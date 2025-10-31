@@ -303,6 +303,9 @@ control_relay_pattern_auto() {
     local relay_cmd_on="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1"
     local relay_cmd_off="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0"
 
+    # STOP any previous pattern first
+    stop_siren_pattern
+
     case "$level" in
         "NORMAL"|"SAFE")
             echo "$(date): [AUTO] Siren OFF (NORMAL/SAFE)"
@@ -310,19 +313,15 @@ control_relay_pattern_auto() {
             ;;
 
         "ALERT")
-            echo "$(date): [AUTO] Starting WARNING siren pattern..."
+            echo "$(date): [AUTO] Starting ALERT siren pattern..."
             (
                 while true; do
-                    echo "$(date): [AUTO-WARNING] Siren ON (10s)"
                     $relay_cmd_on
                     sleep 10
-                    echo "$(date): [AUTO-WARNING] Siren OFF (5s)"
                     $relay_cmd_off
                     sleep 5
-                    echo "$(date): [AUTO-WARNING] Siren ON (10s)"
                     $relay_cmd_on
                     sleep 10
-                    echo "$(date): [AUTO-WARNING] Siren OFF (30s)"
                     $relay_cmd_off
                     sleep 60
                 done
@@ -331,19 +330,15 @@ control_relay_pattern_auto() {
             ;;
 
         "WARNING")
-            echo "$(date): [AUTO] Starting ALERT siren pattern..."
+            echo "$(date): [AUTO] Starting WARNING siren pattern..."
             (
                 while true; do
-                    echo "$(date): [AUTO-ALERT] Siren ON (10s)"
                     $relay_cmd_on
                     sleep 10
-                    echo "$(date): [AUTO-ALERT] Siren OFF (5s)"
                     $relay_cmd_off
                     sleep 5
-                    echo "$(date): [AUTO-ALERT] Siren ON (10s)"
                     $relay_cmd_on
                     sleep 10
-                    echo "$(date): [AUTO-ALERT] Siren OFF (1min)"
                     $relay_cmd_off
                     sleep 30
                 done
@@ -355,13 +350,9 @@ control_relay_pattern_auto() {
             echo "$(date): [AUTO] Siren ON continuously (DANGER)"
             $relay_cmd_on
             ;;
-
-        *)
-            echo "$(date): [AUTO] Unknown level '$level' — Siren OFF"
-            $relay_cmd_off
-            ;;
     esac
 }
+
 
 # Start MQTT subscription in background for control and mode with retry
 (
