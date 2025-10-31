@@ -16,6 +16,7 @@ export MQTT_MODE_TOPIC="${MQTT_MODE_TOPIC:-EA/${MQTT_CLIENT_ID}/mode/control}"
 
 # Add new MQTT topic to set threshold 
 export MQTT_THRESHOLD_TOPIC="${MQTT_THRESHOLD_TOPIC:-EA/${MQTT_CLIENT_ID}/threshold/set}"
+export MQTT_DISTANCE_DEBUG_TOPIC="${MQTT_DISTANCE_DEBUG_TOPIC:-EA/${MQTT_CLIENT_ID}/distance/debug}"
 
 
 

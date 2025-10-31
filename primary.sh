@@ -160,7 +160,7 @@ CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
 
 # Default mode is AUTO
 echo "5.0" > /tmp/current_threshold
-CURRENT_THRESHOLD=$(cat /tmp/current_mode 2>/dev/null || echo "5.0")
+CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "5.0")
 
 
 # Initialize thresholds for 4 levels
@@ -168,6 +168,7 @@ echo "1.5"  > /tmp/threshold_normal
 echo "3.0"  > /tmp/threshold_warning
 echo "5.0"  > /tmp/threshold_alert
 echo "8.0"  > /tmp/threshold_danger
+echo "5.0"  > /tmp/distance_debug
 # echo "8.0"  > /tmp/threshold_normal
 # echo "5.0"  > /tmp/threshold_warning
 # echo "3.0"  > /tmp/threshold_alert
@@ -263,6 +264,9 @@ control_relay_pattern() {
         -t "$MQTT_THRESHOLD_WARNING_TOPIC" \
         -t "$MQTT_THRESHOLD_ALERT_TOPIC" \
         -t "$MQTT_THRESHOLD_DANGER_TOPIC" \
+        -t "$MQTT_DISTANCE_DEBUG_TOPIC" \
+
+
 
         -t "$MQTT_REBOOT_TOPIC" \
         -q "$MQTT_QOS" -v | while read -r full_message; do
@@ -313,6 +317,9 @@ control_relay_pattern() {
           echo "$message" > /tmp/threshold_alert && echo "$(date): ALERT threshold updated to $message"
         elif [[ "$topic" == "$MQTT_THRESHOLD_DANGER_TOPIC" ]]; then
           echo "$message" > /tmp/threshold_danger && echo "$(date): DANGER threshold updated to $message"
+        elif [[ "$topic" == "$MQTT_DISTANCE_DEBUG_TOPIC" ]]; then
+          echo "$message" > /tmp/distance_debug
+
         # elif [[ "$topic" == "$MQTT_THRESHOLD_TOPIC" ]]; then
         #     if [[ "$message" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
         #         echo "$message" > /tmp/current_threshold
@@ -340,7 +347,8 @@ control_relay_pattern() {
 # Sensor loop
 while true; do
     if RAW_VALUE=$(cat "$SENSOR_DIR/in_voltage1_raw" 2>/dev/null); then
-        ULTRASONIC_DISTANCE=$(echo "scale=3; ($RAW_VALUE * 10) / 1303" | bc)
+        ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
+        # ULTRASONIC_DISTANCE=$(echo "scale=3; ($RAW_VALUE * 10) / 1303" | bc)
 
         CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
         CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "5.0")
