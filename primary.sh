@@ -107,6 +107,7 @@ load_mqtt_config() {
 }
 
 # Create startup script
+# Create startup script
 create_startup_script() {
     log_info "Creating ultrasonic sensor startup script"
     
@@ -154,16 +155,13 @@ OUTPUT_DIR="$(dirname "$OUTPUT_FILE")"
 
 echo "Starting ultrasonic sensor monitoring..."
 
-
-
 # Default mode is AUTO
 echo "AUTO" > /tmp/current_mode
 CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
 
-# Default mode is AUTO
+# Default threshold
 echo "5.0" > /tmp/current_threshold
 CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "5.0")
-
 
 # Initialize thresholds for 4 levels
 echo "8.0"  > /tmp/threshold_normal
@@ -171,7 +169,6 @@ echo "5.0"  > /tmp/threshold_warning
 echo "3.0"  > /tmp/threshold_alert
 echo "2.0"  > /tmp/threshold_danger
 echo "5.0"  > /tmp/distance_debug
-
 
 # --- Load thresholds from persistent file or initialize defaults ---
 THRESHOLD_PERSIST_FILE="/home/pi/thresholds.conf"
@@ -203,108 +200,168 @@ echo "Publish Topic: $MQTT_TOPIC"
 echo "Subscribe Topic: $MQTT_SUBSCRIBE_TOPIC"
 echo "Measurement interval: ${MEASUREMENT_INTERVAL}s"
 
-# Function to control relay based on MQTT messages
-# Function to control relay based on MQTT messages (for MANUAL mode)
-control_relay() {
-    local message="$1"
-    case "$message" in
-        "ON"|"1")
-            echo "$(date): Received command to turn relay ON"
-            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
-            ;;
-        "OFF"|"0")
-            echo "$(date): Received command to turn relay OFF"
-            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
-            ;;
-        *)
-            echo "$(date): Received unknown relay command: $message"
-            ;;
-    esac
+# PID file for pattern processes
+PATTERN_PID_FILE="/tmp/siren_pattern.pid"
+
+# Function to stop any running siren pattern
+stop_siren_pattern() {
+    if [[ -f "$PATTERN_PID_FILE" ]]; then
+        local old_pid
+        old_pid=$(cat "$PATTERN_PID_FILE")
+        if ps -p "$old_pid" > /dev/null 2>&1; then
+            echo "$(date): Stopping siren pattern (PID $old_pid)"
+            kill "$old_pid" 2>/dev/null
+            # Wait a bit for process to terminate
+            sleep 1
+        fi
+        rm -f "$PATTERN_PID_FILE"
+    fi
 }
 
-# --- Relay Pattern Controller for multi-thresholds ---
-# --- Relay Pattern Controller for multi-thresholds ---
-control_relay_pattern() {
-    local level="$1"
+# Function to control relay based on MQTT messages (for MANUAL mode)
+control_relay_manual() {
+    local message="$1"
     local relay_cmd_on="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1"
     local relay_cmd_off="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0"
-
-
-    case "$level" in
-        "NORMAL"|"SAFE")
-            echo "$(date): Siren OFF (NORMAL/SAFE)"
+    
+    case "$message" in
+        "ON"|"1")
+            echo "$(date): [MANUAL] Turning relay ON"
+            $relay_cmd_on
+            ;;
+        "OFF"|"0")
+            echo "$(date): [MANUAL] Turning relay OFF"
             $relay_cmd_off
             ;;
-
         "WARNING")
-            echo "$(date): Starting WARNING siren pattern..."
+            echo "$(date): [MANUAL] Starting WARNING siren pattern"
+            stop_siren_pattern
             (
                 while true; do
-                    echo "$(date): [WARNING] Siren ON (10s)"
+                    echo "$(date): [MANUAL-WARNING] Siren ON (10s)"
                     $relay_cmd_on
                     sleep 10
-
-                    echo "$(date): [WARNING] Siren OFF (5s)"
+                    echo "$(date): [MANUAL-WARNING] Siren OFF (5s)"
                     $relay_cmd_off
                     sleep 5
-
-                    echo "$(date): [WARNING] Siren ON (10s)"
+                    echo "$(date): [MANUAL-WARNING] Siren ON (10s)"
                     $relay_cmd_on
                     sleep 10
-
-                    echo "$(date): [WARNING] Siren OFF (30s)"
+                    echo "$(date): [MANUAL-WARNING] Siren OFF (30s)"
                     $relay_cmd_off
                     sleep 30
                 done
             ) &
+            echo $! > "$PATTERN_PID_FILE"
             ;;
-
         "ALERT")
-            echo "$(date): Starting ALERT siren pattern..."
+            echo "$(date): [MANUAL] Starting ALERT siren pattern"
+            stop_siren_pattern
             (
                 while true; do
-                    echo "$(date): [ALERT] Siren ON (10s)"
+                    echo "$(date): [MANUAL-ALERT] Siren ON (10s)"
                     $relay_cmd_on
                     sleep 10
-
-                    echo "$(date): [ALERT] Siren OFF (5s)"
+                    echo "$(date): [MANUAL-ALERT] Siren OFF (5s)"
                     $relay_cmd_off
                     sleep 5
-
-                    echo "$(date): [ALERT] Siren ON (10s)"
+                    echo "$(date): [MANUAL-ALERT] Siren ON (10s)"
                     $relay_cmd_on
                     sleep 10
-
-                    echo "$(date): [ALERT] Siren OFF (1min)"
+                    echo "$(date): [MANUAL-ALERT] Siren OFF (1min)"
                     $relay_cmd_off
                     sleep 60
                 done
             ) &
-           
+            echo $! > "$PATTERN_PID_FILE"
+            ;;
+        "DANGER")
+            echo "$(date): [MANUAL] Turning relay ON continuously (DANGER)"
+            stop_siren_pattern
+            $relay_cmd_on
+            ;;
+        "STOP"|"SAFE")
+            echo "$(date): [MANUAL] Stopping all siren patterns"
+            stop_siren_pattern
+            $relay_cmd_off
+            ;;
+        *)
+            echo "$(date): [MANUAL] Unknown relay command: $message"
+            ;;
+    esac
+}
+
+# --- Relay Pattern Controller for multi-thresholds (AUTO mode) ---
+control_relay_pattern_auto() {
+    local level="$1"
+    local relay_cmd_on="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1"
+    local relay_cmd_off="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0"
+
+    case "$level" in
+        "NORMAL"|"SAFE")
+            echo "$(date): [AUTO] Siren OFF (NORMAL/SAFE)"
+            $relay_cmd_off
+            ;;
+
+        "WARNING")
+            echo "$(date): [AUTO] Starting WARNING siren pattern..."
+            (
+                while true; do
+                    echo "$(date): [AUTO-WARNING] Siren ON (10s)"
+                    $relay_cmd_on
+                    sleep 10
+                    echo "$(date): [AUTO-WARNING] Siren OFF (5s)"
+                    $relay_cmd_off
+                    sleep 5
+                    echo "$(date): [AUTO-WARNING] Siren ON (10s)"
+                    $relay_cmd_on
+                    sleep 10
+                    echo "$(date): [AUTO-WARNING] Siren OFF (30s)"
+                    $relay_cmd_off
+                    sleep 30
+                done
+            ) &
+            echo $! > "$PATTERN_PID_FILE"
+            ;;
+
+        "ALERT")
+            echo "$(date): [AUTO] Starting ALERT siren pattern..."
+            (
+                while true; do
+                    echo "$(date): [AUTO-ALERT] Siren ON (10s)"
+                    $relay_cmd_on
+                    sleep 10
+                    echo "$(date): [AUTO-ALERT] Siren OFF (5s)"
+                    $relay_cmd_off
+                    sleep 5
+                    echo "$(date): [AUTO-ALERT] Siren ON (10s)"
+                    $relay_cmd_on
+                    sleep 10
+                    echo "$(date): [AUTO-ALERT] Siren OFF (1min)"
+                    $relay_cmd_off
+                    sleep 60
+                done
+            ) &
+            echo $! > "$PATTERN_PID_FILE"
             ;;
 
         "DANGER")
-            echo "$(date): Siren ON continuously (DANGER)"
+            echo "$(date): [AUTO] Siren ON continuously (DANGER)"
             $relay_cmd_on
             ;;
 
         *)
-            echo "$(date): Unknown level '$level' — Siren OFF"
+            echo "$(date): [AUTO] Unknown level '$level' — Siren OFF"
             $relay_cmd_off
             ;;
     esac
 }
 
-
-
-# Start MQTT subscription in background with retry on failure
-# Start MQTT subscription in background for control and mode
 # Start MQTT subscription in background for control and mode with retry
 (
     until mosquitto_sub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
         -t "$MQTT_SUBSCRIBE_TOPIC" \
         -t "$MQTT_MODE_TOPIC" \
-        -t "$MQTT_THRESHOLD_TOPIC" \
         -t "$MQTT_THRESHOLD_NORMAL_TOPIC" \
         -t "$MQTT_THRESHOLD_WARNING_TOPIC" \
         -t "$MQTT_THRESHOLD_ALERT_TOPIC" \
@@ -317,130 +374,77 @@ control_relay_pattern() {
         message=$(cut -d' ' -f2- <<< "$full_message")
 
         if [[ "$topic" == "$MQTT_MODE_TOPIC" ]]; then
-          if [[ "$message" =~ ^(AUTO|MANUAL)$ ]]; then
-              echo "$message" > /tmp/current_mode
-              echo "$(date): Switched mode to: $message"
+            if [[ "$message" =~ ^(AUTO|MANUAL)$ ]]; then
+                echo "$message" > /tmp/current_mode
+                echo "$(date): Switched mode to: $message"
 
-              if [[ "$message" == "MANUAL" ]]; then
-                  # Stop any running siren pattern when switching to MANUAL
-                  local pattern_pid_file="/tmp/siren_pattern.pid"
-                  if [[ -f "$pattern_pid_file" ]]; then
-                      local old_pid
-                      old_pid=$(cat "$pattern_pid_file")
-                      if ps -p "$old_pid" > /dev/null 2>&1; then
-                          echo "$(date): Stopping AUTO mode siren pattern (PID $old_pid)"
-                          kill "$old_pid" 2>/dev/null
-                      fi
-                      rm -f "$pattern_pid_file"
-                  fi
-                  echo "$(date): MANUAL mode activated - siren patterns stopped"
-                  
-              elif [[ "$message" == "AUTO" ]]; then
-                  # Immediately evaluate and trigger appropriate pattern using current distance from /tmp/distance_debug
-                  THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null || echo "2.0")
-                  THRESHOLD_ALERT=$(cat /tmp/threshold_alert 2>/dev/null || echo "3.0")
-                  THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "5.0")
-                  THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null || echo "8.0")
-                  ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
+                if [[ "$message" == "MANUAL" ]]; then
+                    # Stop any running AUTO mode patterns when switching to MANUAL
+                    stop_siren_pattern
+                    echo "$(date): MANUAL mode activated - AUTO patterns stopped"
+                    
+                elif [[ "$message" == "AUTO" ]]; then
+                    # Stop any running MANUAL patterns when switching to AUTO
+                    stop_siren_pattern
+                    # Immediately evaluate and trigger appropriate pattern
+                    THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null || echo "2.0")
+                    THRESHOLD_ALERT=$(cat /tmp/threshold_alert 2>/dev/null || echo "3.0")
+                    THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "5.0")
+                    THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null || echo "8.0")
+                    ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
 
-                  if (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_DANGER" | bc -l) )); then
-                      LEVEL="DANGER"
-                  elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_ALERT" | bc -l) )); then
-                      LEVEL="ALERT"
-                  elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_WARNING" | bc -l) )); then
-                      LEVEL="WARNING"
-                  elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_NORMAL" | bc -l) )); then
-                      LEVEL="NORMAL"
-                  else
-                      LEVEL="SAFE"
-                  fi
+                    if (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_DANGER" | bc -l) )); then
+                        LEVEL="DANGER"
+                    elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_ALERT" | bc -l) )); then
+                        LEVEL="ALERT"
+                    elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_WARNING" | bc -l) )); then
+                        LEVEL="WARNING"
+                    elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_NORMAL" | bc -l) )); then
+                        LEVEL="NORMAL"
+                    else
+                        LEVEL="SAFE"
+                    fi
 
-                  echo "$(date): AUTO mode activated - triggering $LEVEL pattern (distance: $ULTRASONIC_DISTANCE)"
-                  control_relay_pattern "$LEVEL"
-                  echo "$LEVEL" > /tmp/previous_state
-              fi
-          else
-              echo "$(date): Invalid mode received: $message"
-          fi
-          if [[ "$message" =~ ^(AUTO|MANUAL)$ ]]; then
-              echo "$message" > /tmp/current_mode
-              echo "$(date): Switched mode to: $message"
+                    echo "$(date): AUTO mode activated - triggering $LEVEL pattern (distance: $ULTRASONIC_DISTANCE)"
+                    control_relay_pattern_auto "$LEVEL"
+                    echo "$LEVEL" > /tmp/previous_state
+                fi
+            else
+                echo "$(date): Invalid mode received: $message"
+            fi
 
-              if [[ "$message" == "MANUAL" ]]; then
-                  # Stop any running siren pattern when switching to MANUAL
-                  local pattern_pid_file="/tmp/siren_pattern.pid"
-                  if [[ -f "$pattern_pid_file" ]]; then
-                      local old_pid
-                      old_pid=$(cat "$pattern_pid_file")
-                      if ps -p "$old_pid" > /dev/null 2>&1; then
-                          echo "$(date): Stopping AUTO mode siren pattern (PID $old_pid)"
-                          kill "$old_pid" 2>/dev/null
-                      fi
-                      rm -f "$pattern_pid_file"
-                  fi
-                  echo "$(date): MANUAL mode activated - siren patterns stopped"
-                  
-              elif [[ "$message" == "AUTO" ]]; then
-                  # Immediately evaluate and trigger appropriate pattern
-                  THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null || echo "2.0")
-                  THRESHOLD_ALERT=$(cat /tmp/threshold_alert 2>/dev/null || echo "3.0")
-                  THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "5.0")
-                  THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null || echo "8.0")
-                  ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
-
-                  if (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_DANGER" | bc -l) )); then
-                      LEVEL="DANGER"
-                  elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_ALERT" | bc -l) )); then
-                      LEVEL="ALERT"
-                  elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_WARNING" | bc -l) )); then
-                      LEVEL="WARNING"
-                  elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_NORMAL" | bc -l) )); then
-                      LEVEL="NORMAL"
-                  else
-                      LEVEL="SAFE"
-                  fi
-
-                  echo "$(date): AUTO mode activated - triggering $LEVEL pattern"
-                  control_relay_pattern "$LEVEL"
-                  echo "$LEVEL" > /tmp/previous_state
-              fi
-          else
-              echo "$(date): Invalid mode received: $message"
-          fi
         elif [[ "$topic" == "$MQTT_SUBSCRIBE_TOPIC" ]]; then
             CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
             if [[ "$CURRENT_MODE" == "MANUAL" ]]; then
                 echo "$(date): MANUAL mode - received relay command: $message"
-                control_relay "$message"
+                control_relay_manual "$message"
             else
                 echo "$(date): AUTO mode - ignoring manual command: $message"
             fi
-        elif [[ "$topic" == "$MQTT_THRESHOLD_NORMAL_TOPIC" ]]; then
-          echo "$message" > /tmp/threshold_normal
-          sed -i "s/^THRESHOLD_NORMAL=.*/THRESHOLD_NORMAL=$message/" "$THRESHOLD_PERSIST_FILE"
-          echo "$(date): NORMAL threshold updated to $message (saved)"
-        elif [[ "$topic" == "$MQTT_THRESHOLD_WARNING_TOPIC" ]]; then
-          echo "$message" > /tmp/threshold_warning
-          sed -i "s/^THRESHOLD_WARNING=.*/THRESHOLD_WARNING=$message/" "$THRESHOLD_PERSIST_FILE"
-          echo "$(date): WARNING threshold updated to $message (saved)"
-        elif [[ "$topic" == "$MQTT_THRESHOLD_ALERT_TOPIC" ]]; then
-          echo "$message" > /tmp/threshold_alert
-          sed -i "s/^THRESHOLD_ALERT=.*/THRESHOLD_ALERT=$message/" "$THRESHOLD_PERSIST_FILE"
-          echo "$(date): ALERT threshold updated to $message (saved)"
-        elif [[ "$topic" == "$MQTT_THRESHOLD_DANGER_TOPIC" ]]; then
-          echo "$message" > /tmp/threshold_danger
-          sed -i "s/^THRESHOLD_DANGER=.*/THRESHOLD_DANGER=$message/" "$THRESHOLD_PERSIST_FILE"
-          echo "$(date): DANGER threshold updated to $message (saved)"
-        elif [[ "$topic" == "$MQTT_DISTANCE_DEBUG_TOPIC" ]]; then
-          echo "$message" > /tmp/distance_debug
 
-        # elif [[ "$topic" == "$MQTT_THRESHOLD_TOPIC" ]]; then
-        #     if [[ "$message" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-        #         echo "$message" > /tmp/current_threshold
-        #         echo "$(date): Threshold updated to: $message"
-        #     else
-        #         echo "$(date): Invalid threshold received: $message"
-        #     fi
+        elif [[ "$topic" == "$MQTT_THRESHOLD_NORMAL_TOPIC" ]]; then
+            echo "$message" > /tmp/threshold_normal
+            sed -i "s/^THRESHOLD_NORMAL=.*/THRESHOLD_NORMAL=$message/" "$THRESHOLD_PERSIST_FILE"
+            echo "$(date): NORMAL threshold updated to $message (saved)"
+
+        elif [[ "$topic" == "$MQTT_THRESHOLD_WARNING_TOPIC" ]]; then
+            echo "$message" > /tmp/threshold_warning
+            sed -i "s/^THRESHOLD_WARNING=.*/THRESHOLD_WARNING=$message/" "$THRESHOLD_PERSIST_FILE"
+            echo "$(date): WARNING threshold updated to $message (saved)"
+
+        elif [[ "$topic" == "$MQTT_THRESHOLD_ALERT_TOPIC" ]]; then
+            echo "$message" > /tmp/threshold_alert
+            sed -i "s/^THRESHOLD_ALERT=.*/THRESHOLD_ALERT=$message/" "$THRESHOLD_PERSIST_FILE"
+            echo "$(date): ALERT threshold updated to $message (saved)"
+
+        elif [[ "$topic" == "$MQTT_THRESHOLD_DANGER_TOPIC" ]]; then
+            echo "$message" > /tmp/threshold_danger
+            sed -i "s/^THRESHOLD_DANGER=.*/THRESHOLD_DANGER=$message/" "$THRESHOLD_PERSIST_FILE"
+            echo "$(date): DANGER threshold updated to $message (saved)"
+
+        elif [[ "$topic" == "$MQTT_DISTANCE_DEBUG_TOPIC" ]]; then
+            echo "$message" > /tmp/distance_debug
+
         elif [[ "$topic" == "$MQTT_REBOOT_TOPIC" ]]; then
             if [[ "$message" == "1" || "$message" == "REBOOT" ]]; then
                 echo "$(date): Reboot command received via MQTT"
@@ -456,16 +460,13 @@ control_relay_pattern() {
     done
 ) &
 
-# Continuous measurement loop
-# Continuous measurement loop
-# Sensor loop
-# --- Continuous monitoring loop ---
+# --- Continuous monitoring loop (AUTO mode only) ---
 while true; do
     # --- Get latest readings from temp files ---
     ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
     CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
 
-    # --- Read thresholds (individually updated from MQTT_DEBUG_TOPICMQTT) ---
+    # --- Read thresholds ---
     THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null || echo "2.0")
     THRESHOLD_ALERT=$(cat /tmp/threshold_alert 2>/dev/null || echo "3.0")
     THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "5.0")
@@ -509,13 +510,10 @@ while true; do
         PREVIOUS_STATE=$(cat /tmp/previous_state 2>/dev/null || echo "UNKNOWN")
         
         if [[ "$LEVEL" != "$PREVIOUS_STATE" ]]; then
-            echo "$(date): Level changed → $LEVEL (distance: $ULTRASONIC_DISTANCE)"
-            control_relay_pattern "$LEVEL"
+            echo "$(date): [AUTO] Level changed → $LEVEL (distance: $ULTRASONIC_DISTANCE)"
+            control_relay_pattern_auto "$LEVEL"
             echo "$LEVEL" > /tmp/previous_state
         fi
-    else
-        # MANUAL mode - don't trigger any automatic patterns
-        : # no-op
     fi
 
     sleep "$MEASUREMENT_INTERVAL"
