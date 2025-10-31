@@ -391,7 +391,16 @@ control_relay_pattern_auto() {
                     THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "3.0")
                     THRESHOLD_ALERT=$(cat /tmp/threshold_alert 2>/dev/null || echo "5.0")
                     THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null || echo "8.0")
-                    ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
+                    # ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
+
+                    # --- Get latest reading from ultrasonic sensor ---
+                    if RAW_VALUE=$(cat "$SENSOR_DIR/in_voltage1_raw" 2>/dev/null); then
+                        # Convert raw ADC to distance in meters
+                        ULTRASONIC_DISTANCE=$(echo "scale=3; ($RAW_VALUE * 10) / 1303" | bc)
+                    else
+                        echo "$(date): WARNING - Unable to read sensor, using fallback distance 5.0m"
+                        ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
+                    fi
 
                     MAX_HEIGHT=$(cat /tmp/max_height 2>/dev/null || echo "3.9")
                     OFFSET_VALUE=$(cat /tmp/offset_value 2>/dev/null || echo "1.0")
@@ -492,7 +501,18 @@ control_relay_pattern_auto() {
 # --- Continuous monitoring loop (AUTO mode only) ---
 while true; do
     # --- Get latest readings from temp files ---
-    ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
+    # ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
+
+
+        # --- Get latest reading from ultrasonic sensor ---
+    if RAW_VALUE=$(cat "$SENSOR_DIR/in_voltage1_raw" 2>/dev/null); then
+        # Convert raw ADC to distance in meters
+        ULTRASONIC_DISTANCE=$(echo "scale=3; ($RAW_VALUE * 10) / 1303" | bc)
+    else
+        echo "$(date): WARNING - Unable to read sensor, using fallback distance 5.0m"
+        ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
+    fi
+
     CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
 
     # --- Read thresholds ---
