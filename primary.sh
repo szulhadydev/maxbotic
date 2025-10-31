@@ -421,10 +421,10 @@ control_relay_pattern_auto() {
 
                     if (( $(echo "$RIVER_DEPTH >= $THRESHOLD_DANGER" | bc -l) )); then
                         LEVEL="DANGER"
-                    elif (( $(echo "$RIVER_DEPTH >= $THRESHOLD_ALERT" | bc -l) )); then
-                        LEVEL="ALERT"
                     elif (( $(echo "$RIVER_DEPTH >= $THRESHOLD_WARNING" | bc -l) )); then
                         LEVEL="WARNING"
+                    elif (( $(echo "$RIVER_DEPTH >= $THRESHOLD_ALERT" | bc -l) )); then
+                        LEVEL="ALERT"
                     elif (( $(echo "$RIVER_DEPTH < $THRESHOLD_NORMAL" | bc -l) )); then
                         LEVEL="NORMAL"
                     else
@@ -535,10 +535,10 @@ WATER_LEVEL="NORMAL"
 
 if (( $(echo "$RIVER_DEPTH >= $THRESHOLD_DANGER" | bc -l) )); then
     WATER_LEVEL="DANGER"
-elif (( $(echo "$RIVER_DEPTH >= $THRESHOLD_ALERT" | bc -l) )); then
-    WATER_LEVEL="ALERT"
 elif (( $(echo "$RIVER_DEPTH >= $THRESHOLD_WARNING" | bc -l) )); then
     WATER_LEVEL="WARNING"
+elif (( $(echo "$RIVER_DEPTH >= $THRESHOLD_ALERT" | bc -l) )); then
+    WATER_LEVEL="ALERT"
 elif (( $(echo "$RIVER_DEPTH < $THRESHOLD_NORMAL" | bc -l) )); then
     WATER_LEVEL="NORMAL"
 else
