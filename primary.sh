@@ -402,13 +402,30 @@ control_relay_pattern_auto() {
                     THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null || echo "8.0")
                     ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
 
-                    if (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_DANGER" | bc -l) )); then
+                    MAX_HEIGHT=$(cat /tmp/max_height 2>/dev/null || echo "3.9")
+                    OFFSET_VALUE=$(cat /tmp/offset_value 2>/dev/null || echo "1.0")
+                    OFFSET_OPERATION=$(cat /tmp/offset_operation 2>/dev/null || echo "minus")
+
+                    # Calculate river depth
+                    if [[ "$OFFSET_OPERATION" == "plus" ]]; then
+                        RIVER_DEPTH=$(echo "$MAX_HEIGHT - ($ULTRASONIC_DISTANCE + $OFFSET_VALUE)" | bc -l)
+                    elif [[ "$OFFSET_OPERATION" == "minus" ]]; then
+                        RIVER_DEPTH=$(echo "$MAX_HEIGHT - ($ULTRASONIC_DISTANCE - $OFFSET_VALUE)" | bc -l)
+                    else
+                        echo "Unknown OFFSET_OPERATION: $OFFSET_OPERATION" >&2
+                        RIVER_DEPTH="NaN"
+                    fi
+
+                # Format river depth as a numeric value with 1–2 decimals
+                RIVER_DEPTH=$(printf "%.2f" "$RIVER_DEPTH")
+
+                    if (( $(echo "$RIVER_DEPTH >= $THRESHOLD_DANGER" | bc -l) )); then
                         LEVEL="DANGER"
-                    elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_ALERT" | bc -l) )); then
+                    elif (( $(echo "$RIVER_DEPTH >= $THRESHOLD_ALERT" | bc -l) )); then
                         LEVEL="ALERT"
-                    elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_WARNING" | bc -l) )); then
+                    elif (( $(echo "$RIVER_DEPTH >= $THRESHOLD_WARNING" | bc -l) )); then
                         LEVEL="WARNING"
-                    elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_NORMAL" | bc -l) )); then
+                    elif (( $(echo "$RIVER_DEPTH < $THRESHOLD_NORMAL" | bc -l) )); then
                         LEVEL="NORMAL"
                     else
                         LEVEL="SAFE"
@@ -513,6 +530,21 @@ while true; do
 # Format river depth as a numeric value with 1–2 decimals
 RIVER_DEPTH=$(printf "%.2f" "$RIVER_DEPTH")
 
+# Default water level
+WATER_LEVEL="NORMAL"
+
+if (( $(echo "$RIVER_DEPTH >= $THRESHOLD_DANGER" | bc -l) )); then
+    WATER_LEVEL="DANGER"
+elif (( $(echo "$RIVER_DEPTH >= $THRESHOLD_ALERT" | bc -l) )); then
+    WATER_LEVEL="ALERT"
+elif (( $(echo "$RIVER_DEPTH >= $THRESHOLD_WARNING" | bc -l) )); then
+    WATER_LEVEL="WARNING"
+elif (( $(echo "$RIVER_DEPTH < $THRESHOLD_NORMAL" | bc -l) )); then
+    WATER_LEVEL="NORMAL"
+else
+    WATER_LEVEL="SAFE"
+fi
+
     # --- Build JSON payload for MQTT ---
     JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \
 \"unit\": \"meters\", \
@@ -527,7 +559,8 @@ RIVER_DEPTH=$(printf "%.2f" "$RIVER_DEPTH")
 \"max_height\": $MAX_HEIGHT, \
 \"offset_value\": $OFFSET_VALUE, \
 \"offset_operation\": \"$OFFSET_OPERATION\", \
-\"river_depth\": $RIVER_DEPTH}"
+\"river_depth\": $RIVER_DEPTH, \
+\"water_level\": \"$WATER_LEVEL\"}"
 
 
     # --- Publish to MQTT ---
