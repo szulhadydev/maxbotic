@@ -210,22 +210,22 @@ echo "Subscribe Topic: $MQTT_SUBSCRIBE_TOPIC"
 echo "Measurement interval: ${MEASUREMENT_INTERVAL}s"
 
 # Function to control relay based on MQTT messages
-# control_relay() {
-#     local message="$1"
-#     case "$message" in
-#         "ON"|"1")
-#             echo "$(date): Received command to turn relay ON"
-#             mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
-#             ;;
-#         "OFF"|"0")
-#             echo "$(date): Received command to turn relay OFF"
-#             mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
-#             ;;
-#         *)
-#             echo "$(date): Received unknown relay command: $message"
-#             ;;
-#     esac
-# }
+control_relay() {
+    local message="$1"
+    case "$message" in
+        "ON"|"1")
+            echo "$(date): Received command to turn relay ON"
+            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
+            ;;
+        "OFF"|"0")
+            echo "$(date): Received command to turn relay OFF"
+            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
+            ;;
+        *)
+            echo "$(date): Received unknown relay command: $message"
+            ;;
+    esac
+}
 
 # --- Relay Pattern Controller for multi-thresholds ---
 # --- Relay Pattern Controller for multi-thresholds ---
