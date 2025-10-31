@@ -498,6 +498,10 @@ while true; do
 
     TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
 
+    
+
+    # RIVER_DEPTH = MAX_HEIGHT - (ULTRASONIC_DISTANCE + )
+
     # --- Build JSON payload for MQTT ---
     JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \
 \"unit\": \"meters\", \
@@ -506,8 +510,8 @@ while true; do
 \"deviceType\": \"ultrasonic\", \
 \"mode\": \"$CURRENT_MODE\", \
 \"threshold_normal\": $THRESHOLD_NORMAL, \
-\"threshold_warning\": $THRESHOLD_WARNING, \
 \"threshold_alert\": $THRESHOLD_ALERT, \
+\"threshold_warning\": $THRESHOLD_WARNING, \
 \"threshold_danger\": $THRESHOLD_DANGER, \
 \"max_height\": $MAX_HEIGHT, \
 \"offset_value\": $OFFSET_VALUE, \
