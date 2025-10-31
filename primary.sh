@@ -192,7 +192,7 @@ else
     THRESHOLD_WARNING=5.0
     THRESHOLD_ALERT=3.0
     THRESHOLD_DANGER=2.0
-  EOF
+    EOF
 fi
 
 # Write values into /tmp for runtime usage
