@@ -371,13 +371,21 @@ control_relay_pattern() {
                 echo "$(date): AUTO mode - ignoring manual command: $message"
             fi
         elif [[ "$topic" == "$MQTT_THRESHOLD_NORMAL_TOPIC" ]]; then
-          echo "$message" > /tmp/threshold_normal && echo "$(date): NORMAL threshold updated to $message"
+          echo "$message" > /tmp/threshold_normal
+          sed -i "s/^THRESHOLD_NORMAL=.*/THRESHOLD_NORMAL=$message/" "$THRESHOLD_PERSIST_FILE"
+          echo "$(date): NORMAL threshold updated to $message (saved)"
         elif [[ "$topic" == "$MQTT_THRESHOLD_WARNING_TOPIC" ]]; then
-          echo "$message" > /tmp/threshold_warning && echo "$(date): WARNING threshold updated to $message"
+          echo "$message" > /tmp/threshold_warning
+          sed -i "s/^THRESHOLD_WARNING=.*/THRESHOLD_WARNING=$message/" "$THRESHOLD_PERSIST_FILE"
+          echo "$(date): WARNING threshold updated to $message (saved)"
         elif [[ "$topic" == "$MQTT_THRESHOLD_ALERT_TOPIC" ]]; then
-          echo "$message" > /tmp/threshold_alert && echo "$(date): ALERT threshold updated to $message"
+          echo "$message" > /tmp/threshold_alert
+          sed -i "s/^THRESHOLD_ALERT=.*/THRESHOLD_ALERT=$message/" "$THRESHOLD_PERSIST_FILE"
+          echo "$(date): ALERT threshold updated to $message (saved)"
         elif [[ "$topic" == "$MQTT_THRESHOLD_DANGER_TOPIC" ]]; then
-          echo "$message" > /tmp/threshold_danger && echo "$(date): DANGER threshold updated to $message"
+          echo "$message" > /tmp/threshold_danger
+          sed -i "s/^THRESHOLD_DANGER=.*/THRESHOLD_DANGER=$message/" "$THRESHOLD_PERSIST_FILE"
+          echo "$(date): DANGER threshold updated to $message (saved)"
         elif [[ "$topic" == "$MQTT_DISTANCE_DEBUG_TOPIC" ]]; then
           echo "$message" > /tmp/distance_debug
 
