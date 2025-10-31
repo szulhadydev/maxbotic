@@ -23,7 +23,7 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CURRENT_MODE="${CURRENT_MODE:-AUTO}"
 # echo "Initialized mode: $CURRENT_MODE"
 
-
+# THRESHOLD_PERSIST_FILE="/home/pi/thresholds.conf"
 
 # Logging functions
 log_info() {
@@ -154,6 +154,8 @@ OUTPUT_DIR="$(dirname "$OUTPUT_FILE")"
 
 echo "Starting ultrasonic sensor monitoring..."
 
+
+
 # Default mode is AUTO
 echo "AUTO" > /tmp/current_mode
 CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
@@ -176,6 +178,29 @@ echo "5.0"  > /tmp/distance_debug
 # echo "3.0"  > /tmp/threshold_alert
 # echo "1.5"  > /tmp/threshold_danger
 
+
+# --- Load thresholds from persistent file or initialize defaults ---
+THRESHOLD_PERSIST_FILE="/home/pi/thresholds.conf"
+
+if [[ -f "$THRESHOLD_PERSIST_FILE" ]]; then
+    echo "$(date): Loading thresholds from $THRESHOLD_PERSIST_FILE"
+    source "$THRESHOLD_PERSIST_FILE"
+else
+    echo "$(date): Threshold config not found, creating defaults..."
+    cat <<EOF > "$THRESHOLD_PERSIST_FILE"
+    THRESHOLD_NORMAL=8.0
+    THRESHOLD_WARNING=5.0
+    THRESHOLD_ALERT=3.0
+    THRESHOLD_DANGER=2.0
+  EOF
+fi
+
+# Write values into /tmp for runtime usage
+echo "$THRESHOLD_NORMAL"  > /tmp/threshold_normal
+echo "$THRESHOLD_WARNING" > /tmp/threshold_warning
+echo "$THRESHOLD_ALERT"   > /tmp/threshold_alert
+echo "$THRESHOLD_DANGER"  > /tmp/threshold_danger
+echo "5.0" > /tmp/distance_debug
 
 # State tracking for relay logic
 PREVIOUS_STATE="UNKNOWN"
