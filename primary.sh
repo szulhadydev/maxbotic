@@ -524,7 +524,7 @@ while true; do
 \"max_height\": $MAX_HEIGHT, \
 \"offset_value\": $OFFSET_VALUE, \
 \"offset_operation\": \"$OFFSET_OPERATION\", \
-\"river_depth\": RIVER_DEPTH}"
+\"river_depth\": $RIVER_DEPTH}"
 
 
     # --- Publish to MQTT ---
