@@ -164,11 +164,13 @@ CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "5.0")
 
 
 # Initialize thresholds for 4 levels
-echo "1.5"  > /tmp/threshold_normal
-echo "3.0"  > /tmp/threshold_warning
-echo "5.0"  > /tmp/threshold_alert
-echo "8.0"  > /tmp/threshold_danger
+echo "8.0"  > /tmp/threshold_normal
+echo "5.0"  > /tmp/threshold_warning
+echo "3.0"  > /tmp/threshold_alert
+echo "2.0"  > /tmp/threshold_danger
 echo "5.0"  > /tmp/distance_debug
+
+
 # echo "8.0"  > /tmp/threshold_normal
 # echo "5.0"  > /tmp/threshold_warning
 # echo "3.0"  > /tmp/threshold_alert
@@ -345,80 +347,62 @@ control_relay_pattern() {
 # Continuous measurement loop
 # Continuous measurement loop
 # Sensor loop
+# --- Continuous monitoring loop ---
 while true; do
-    # if RAW_VALUE=$(cat "$SENSOR_DIR/in_voltage1_raw" 2>/dev/null); then
-        ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
-        # ULTRASONIC_DISTANCE=$(echo "scale=3; ($RAW_VALUE * 10) / 1303" | bc)
+    # --- Get latest readings from temp files ---
+    ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
+    CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
 
-        CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
-        CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "5.0")
-        TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
+    # --- Read thresholds (individually updated from MQTT) ---
+    THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null || echo "2.0")
+    THRESHOLD_ALERT=$(cat /tmp/threshold_alert 2>/dev/null || echo "3.0")
+    THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "5.0")
+    THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null || echo "8.0")
 
-        # Multi-stage thresholds
-        THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null)
-        THRESHOLD_SAFE=$(cat /tmp/threshold_safe 2>/dev/null)
-        THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null)
-        THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null)
+    TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
 
-        # JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \"unit\": \"meters\", \"timestamp\": \"$TIMESTAMP\", \"devEUI\": \"$MQTT_CLIENT_ID\",\"deviceType\":\"ultrasonic\", \"raw_value\": $RAW_VALUE, \"mode\": \"$CURRENT_MODE\", \"threshold\": $CURRENT_THRESHOLD}"
+    # --- Build JSON payload for MQTT ---
+    JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \
+\"unit\": \"meters\", \
+\"timestamp\": \"$TIMESTAMP\", \
+\"devEUI\": \"$MQTT_CLIENT_ID\", \
+\"deviceType\": \"ultrasonic\", \
+\"mode\": \"$CURRENT_MODE\", \
+\"threshold_normal\": $THRESHOLD_NORMAL, \
+\"threshold_warning\": $THRESHOLD_WARNING, \
+\"threshold_alert\": $THRESHOLD_ALERT, \
+\"threshold_danger\": $THRESHOLD_DANGER}"
 
-        JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \"unit\": \"meters\", \"timestamp\": \"$TIMESTAMP\", \"devEUI\": \"$MQTT_CLIENT_ID\", \"deviceType\": \"ultrasonic\", \"raw_value\": $RAW_VALUE, \"mode\": \"$CURRENT_MODE\", \"threshold_normal\": $THRESHOLD_NORMAL, \"threshold_safe\": $THRESHOLD_SAFE, \"threshold_warning\": $THRESHOLD_WARNING, \"threshold_danger\": $THRESHOLD_DANGER}"
+    # --- Publish to MQTT ---
+    mosquitto_pub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
+        -t "$MQTT_TOPIC" -q "$MQTT_QOS" -m "$JSON_PAYLOAD" \
+        && echo "$(date): [MQTT] Distance: $ULTRASONIC_DISTANCE m (published)" \
+        || echo "$(date): [MQTT] Publish failed" >&2
 
-
-
-        echo "$TIMESTAMP,$ULTRASONIC_DISTANCE" >> "$OUTPUT_FILE"
-
-        mosquitto_pub -h "$MQTT_BROKER" -p "$MQTT_PORT" -t "$MQTT_TOPIC" -q "$MQTT_QOS" -m "$JSON_PAYLOAD" \
-            && echo "$(date): Distance: $ULTRASONIC_DISTANCE (MQTT published)" \
-            || echo "$(date): MQTT publish failed" >&2
-
-        # AUTO mode distance threshold logic (with state change detection)
-        # if [[ "$CURRENT_MODE" == "AUTO" ]]; then
-        #     if (( $(echo "$ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD" | bc -l) )); then
-        #         if [[ "$PREVIOUS_STATE" != "BELOW" ]]; then
-        #             echo "$(date): Distance $ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD — relay ON"
-        #             control_relay "ON"
-        #             PREVIOUS_STATE="BELOW"
-        #         fi
-        #     else
-        #         if [[ "$PREVIOUS_STATE" != "ABOVE" ]]; then
-        #             echo "$(date): Distance $ULTRASONIC_DISTANCE >= $CURRENT_THRESHOLD — relay OFF"
-        #             control_relay "OFF"
-        #             PREVIOUS_STATE="ABOVE"
-        #         fi
-        #     fi
-        # fi
-        if [[ "$CURRENT_MODE" == "AUTO" ]]; then
-            TH_NORMAL=$(cat /tmp/threshold_normal)
-            TH_WARNING=$(cat /tmp/threshold_warning)
-            TH_ALERT=$(cat /tmp/threshold_alert)
-            TH_DANGER=$(cat /tmp/threshold_danger)
-
-            if (( $(echo "$ULTRASONIC_DISTANCE <= $TH_DANGER" | bc -l) )); then
-                LEVEL="DANGER"
-            elif (( $(echo "$ULTRASONIC_DISTANCE <= $TH_ALERT" | bc -l) )); then
-                LEVEL="ALERT"
-            elif (( $(echo "$ULTRASONIC_DISTANCE <= $TH_WARNING" | bc -l) )); then
-                LEVEL="WARNING"
-            elif (( $(echo "$ULTRASONIC_DISTANCE <= $TH_NORMAL" | bc -l) )); then
-                LEVEL="NORMAL"
-            else
-                LEVEL="SAFE"
-            fi
-
-            if [[ "$LEVEL" != "$PREVIOUS_STATE" ]]; then
-                echo "$(date): Level changed to $LEVEL (distance: $ULTRASONIC_DISTANCE)"
-                control_relay_pattern "$LEVEL"
-                PREVIOUS_STATE="$LEVEL"
-            fi
+    # --- AUTO mode: compare against thresholds ---
+    if [[ "$CURRENT_MODE" == "AUTO" ]]; then
+        if (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_DANGER" | bc -l) )); then
+            LEVEL="DANGER"
+        elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_ALERT" | bc -l) )); then
+            LEVEL="ALERT"
+        elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_WARNING" | bc -l) )); then
+            LEVEL="WARNING"
+        elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_NORMAL" | bc -l) )); then
+            LEVEL="NORMAL"
+        else
+            LEVEL="SAFE"
         fi
-    # else
-    #     echo "$(date): ERROR reading sensor value from $SENSOR_DIR/in_voltage1_raw" >&2
-        
+
+        if [[ "$LEVEL" != "$PREVIOUS_STATE" ]]; then
+            echo "$(date): Level changed → $LEVEL (distance: $ULTRASONIC_DISTANCE)"
+            control_relay_pattern "$LEVEL"
+            PREVIOUS_STATE="$LEVEL"
+        fi
     fi
 
     sleep "$MEASUREMENT_INTERVAL"
 done
+
 EOF
 
     # Set proper permissions
