@@ -510,6 +510,9 @@ while true; do
         RIVER_DEPTH="NaN"
     fi
 
+# Format river depth as a numeric value with 1–2 decimals
+RIVER_DEPTH=$(printf "%.2f" "$RIVER_DEPTH")
+
     # --- Build JSON payload for MQTT ---
     JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \
 \"unit\": \"meters\", \
