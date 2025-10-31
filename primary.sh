@@ -372,6 +372,9 @@ control_relay_pattern_auto() {
         -t "$MQTT_THRESHOLD_WARNING_TOPIC" \
         -t "$MQTT_THRESHOLD_ALERT_TOPIC" \
         -t "$MQTT_THRESHOLD_DANGER_TOPIC" \
+        -t "$MQTT_MAX_HEIGHT_TOPIC" \
+        -t "$MQTT_OFFSET_VALUE_TOPIC" \
+        -t "$MQTT_OFFSET_OPERATION_TOPIC" \
         -t "$MQTT_DISTANCE_DEBUG_TOPIC" \
         -t "$MQTT_REBOOT_TOPIC" \
         -q "$MQTT_QOS" -v | while read -r full_message; do
@@ -447,6 +450,18 @@ control_relay_pattern_auto() {
             echo "$message" > /tmp/threshold_danger
             sed -i "s/^THRESHOLD_DANGER=.*/THRESHOLD_DANGER=$message/" "$THRESHOLD_PERSIST_FILE"
             echo "$(date): DANGER threshold updated to $message (saved)"
+            
+        elif [[ "$topic" == "$MQTT_MAX_HEIGHT_TOPIC" ]]; then
+            echo "$message" > /tmp/max_height
+            sed -i "s/^MAX_HEIGHT=.*/MAX_HEIGHT=$message/" "$THRESHOLD_PERSIST_FILE"
+
+        elif [[ "$topic" == "$MQTT_OFFSET_VALUE_TOPIC" ]]; then
+            echo "$message" > /tmp/offset_value
+            sed -i "s/^OFFSET_VALUE=.*/OFFSET_VALUE=$message/" "$THRESHOLD_PERSIST_FILE"
+
+        elif [[ "$topic" == "$MQTT_OFFSET_OPERATION_TOPIC" ]]; then
+            echo "$message" > /tmp/offset_operation
+            sed -i "s/^OFFSET_OPERATION=.*/OFFSET_OPERATION=$message/" "$THRESHOLD_PERSIST_FILE"
 
         elif [[ "$topic" == "$MQTT_DISTANCE_DEBUG_TOPIC" ]]; then
             echo "$message" > /tmp/distance_debug
