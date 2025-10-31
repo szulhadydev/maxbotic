@@ -164,11 +164,11 @@ echo "5.0" > /tmp/current_threshold
 CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "5.0")
 
 # Initialize thresholds for 4 levels
-echo "8.0"  > /tmp/threshold_normal
-echo "5.0"  > /tmp/threshold_warning
-echo "3.0"  > /tmp/threshold_alert
-echo "2.0"  > /tmp/threshold_danger
-echo "5.0"  > /tmp/distance_debug
+# echo "8.0"  > /tmp/threshold_normal
+# echo "5.0"  > /tmp/threshold_warning
+# echo "3.0"  > /tmp/threshold_alert
+# echo "2.0"  > /tmp/threshold_danger
+# echo "5.0"  > /tmp/distance_debug
 
 # --- Load thresholds from persistent file or initialize defaults ---
 THRESHOLD_PERSIST_FILE="/home/pi/thresholds.conf"
@@ -179,16 +179,22 @@ if [[ -f "$THRESHOLD_PERSIST_FILE" ]]; then
 else
   echo "$(date): Threshold config not found, creating defaults..."
   echo "THRESHOLD_NORMAL=8.0" > "$THRESHOLD_PERSIST_FILE"
-  echo "THRESHOLD_WARNING=5.0" >> "$THRESHOLD_PERSIST_FILE"
-  echo "THRESHOLD_ALERT=3.0" >> "$THRESHOLD_PERSIST_FILE"
+  echo "THRESHOLD_ALERT=5.0" >> "$THRESHOLD_PERSIST_FILE"
+  echo "THRESHOLD_WARNING=3.0" >> "$THRESHOLD_PERSIST_FILE"
   echo "THRESHOLD_DANGER=2.0" >> "$THRESHOLD_PERSIST_FILE"
+  echo "MAX_HEIGHT=3.9" >> "$THRESHOLD_PERSIST_FILE"
+  echo "OFFSET_VALUE=1.0" >> "$THRESHOLD_PERSIST_FILE"
+  echo "OFFSET_OPERATION=minus" >> "$THRESHOLD_PERSIST_FILE"
 fi
 
 # Write values into /tmp for runtime usage
 echo "$THRESHOLD_NORMAL"  > /tmp/threshold_normal
-echo "$THRESHOLD_WARNING" > /tmp/threshold_warning
 echo "$THRESHOLD_ALERT"   > /tmp/threshold_alert
+echo "$THRESHOLD_WARNING" > /tmp/threshold_warning
 echo "$THRESHOLD_DANGER"  > /tmp/threshold_danger
+echo "$MAX_HEIGHT"  > /tmp/max_height
+echo "$OFFSET_VALUE"  > /tmp/offset_value
+echo "$OFFSET_OPERATION"  > /tmp/offset_operation
 echo "5.0" > /tmp/distance_debug
 
 # State tracking for relay logic
@@ -303,7 +309,7 @@ control_relay_pattern_auto() {
             $relay_cmd_off
             ;;
 
-        "WARNING")
+        "ALERT")
             echo "$(date): [AUTO] Starting WARNING siren pattern..."
             (
                 while true; do
@@ -318,13 +324,13 @@ control_relay_pattern_auto() {
                     sleep 10
                     echo "$(date): [AUTO-WARNING] Siren OFF (30s)"
                     $relay_cmd_off
-                    sleep 30
+                    sleep 60
                 done
             ) &
             echo $! > "$PATTERN_PID_FILE"
             ;;
 
-        "ALERT")
+        "WARNING")
             echo "$(date): [AUTO] Starting ALERT siren pattern..."
             (
                 while true; do
@@ -339,7 +345,7 @@ control_relay_pattern_auto() {
                     sleep 10
                     echo "$(date): [AUTO-ALERT] Siren OFF (1min)"
                     $relay_cmd_off
-                    sleep 60
+                    sleep 30
                 done
             ) &
             echo $! > "$PATTERN_PID_FILE"
@@ -388,8 +394,8 @@ control_relay_pattern_auto() {
                     stop_siren_pattern
                     # Immediately evaluate and trigger appropriate pattern
                     THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null || echo "2.0")
-                    THRESHOLD_ALERT=$(cat /tmp/threshold_alert 2>/dev/null || echo "3.0")
-                    THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "5.0")
+                    THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "3.0")
+                    THRESHOLD_ALERT=$(cat /tmp/threshold_alert 2>/dev/null || echo "5.0")
                     THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null || echo "8.0")
                     ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
 
@@ -467,10 +473,13 @@ while true; do
     CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
 
     # --- Read thresholds ---
-    THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null || echo "2.0")
-    THRESHOLD_ALERT=$(cat /tmp/threshold_alert 2>/dev/null || echo "3.0")
-    THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "5.0")
     THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null || echo "8.0")
+    THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "5.0")
+    THRESHOLD_ALERT=$(cat /tmp/threshold_alert 2>/dev/null || echo "3.0")
+    THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null || echo "2.0")
+    MAX_HEIGHT=$(cat /tmp/max_height 2>/dev/null || echo "3.9")
+    OFFSET_VALUE=$(cat /tmp/offset_value 2>/dev/null || echo "1.0")
+    OFFSET_OPERATION=$(cat /tmp/offset_operation 2>/dev/null || echo "minus")
 
     TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
 
@@ -484,7 +493,11 @@ while true; do
 \"threshold_normal\": $THRESHOLD_NORMAL, \
 \"threshold_warning\": $THRESHOLD_WARNING, \
 \"threshold_alert\": $THRESHOLD_ALERT, \
-\"threshold_danger\": $THRESHOLD_DANGER}"
+\"threshold_danger\": $THRESHOLD_DANGER, \
+\"max_height\": $MAX_HEIGHT, \
+\"offset_value\": $OFFSET_VALUE, \
+\"offset_operation\": $OFFSET_OPERATION}"
+
 
     # --- Publish to MQTT ---
     mosquitto_pub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
