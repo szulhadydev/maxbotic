@@ -496,7 +496,7 @@ while true; do
 \"threshold_danger\": $THRESHOLD_DANGER, \
 \"max_height\": $MAX_HEIGHT, \
 \"offset_value\": $OFFSET_VALUE, \
-\"offset_operation\": $OFFSET_OPERATION}"
+\"offset_operation\": \"$OFFSET_OPERATION\"}"
 
 
     # --- Publish to MQTT ---
