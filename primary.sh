@@ -210,19 +210,35 @@ echo "Subscribe Topic: $MQTT_SUBSCRIBE_TOPIC"
 echo "Measurement interval: ${MEASUREMENT_INTERVAL}s"
 
 # Function to control relay based on MQTT messages
+# Function to control relay based on MQTT messages (for MANUAL mode)
 control_relay() {
     local message="$1"
+    local relay_cmd_on="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1"
+    local relay_cmd_off="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0"
+    local pattern_pid_file="/tmp/siren_pattern.pid"
+    
+    # Stop any existing pattern process if running (important for MANUAL mode)
+    if [[ -f "$pattern_pid_file" ]]; then
+        local old_pid
+        old_pid=$(cat "$pattern_pid_file")
+        if ps -p "$old_pid" > /dev/null 2>&1; then
+            echo "$(date): [MANUAL] Stopping siren pattern (PID $old_pid)"
+            kill "$old_pid" 2>/dev/null
+        fi
+        rm -f "$pattern_pid_file"
+    fi
+    
     case "$message" in
         "ON"|"1")
-            echo "$(date): Received command to turn relay ON"
-            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
+            echo "$(date): [MANUAL] Turning relay ON"
+            $relay_cmd_on
             ;;
         "OFF"|"0")
-            echo "$(date): Received command to turn relay OFF"
-            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
+            echo "$(date): [MANUAL] Turning relay OFF"
+            $relay_cmd_off
             ;;
         *)
-            echo "$(date): Received unknown relay command: $message"
+            echo "$(date): [MANUAL] Unknown relay command: $message"
             ;;
     esac
 }
