@@ -205,52 +205,92 @@ echo "Measurement interval: ${MEASUREMENT_INTERVAL}s"
 # }
 
 # --- Relay Pattern Controller for multi-thresholds ---
+# --- Relay Pattern Controller for multi-thresholds ---
 control_relay_pattern() {
     local level="$1"
-    local status_msg=""
+    local relay_cmd_on="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1"
+    local relay_cmd_off="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0"
+    local pattern_pid_file="/tmp/siren_pattern.pid"
+
     echo "$(date): Triggering siren pattern for level: $level"
 
+    # Stop any existing pattern process if running
+    if [[ -f "$pattern_pid_file" ]]; then
+        local old_pid
+        old_pid=$(cat "$pattern_pid_file")
+        if ps -p "$old_pid" > /dev/null 2>&1; then
+            echo "$(date): Stopping existing siren pattern (PID $old_pid)"
+            kill "$old_pid" 2>/dev/null
+        fi
+        rm -f "$pattern_pid_file"
+    fi
+
     case "$level" in
-        "NORMAL")
-            # Relay OFF
-            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
-            status_msg="SAFE - Relay OFF"
+        "NORMAL"|"SAFE")
+            echo "$(date): Siren OFF (NORMAL/SAFE)"
+            $relay_cmd_off
             ;;
+
         "WARNING")
-            # 1 short pulse
-            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
-            status_msg="WARNING - pulse"
-            sleep 0.5
-            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
-            status_msg="WARNING - off"
+            echo "$(date): Starting WARNING siren pattern..."
+            (
+                while true; do
+                    echo "$(date): [WARNING] Siren ON (10s)"
+                    $relay_cmd_on
+                    sleep 10
+
+                    echo "$(date): [WARNING] Siren OFF (5s)"
+                    $relay_cmd_off
+                    sleep 5
+
+                    echo "$(date): [WARNING] Siren ON (10s)"
+                    $relay_cmd_on
+                    sleep 10
+
+                    echo "$(date): [WARNING] Siren OFF (30s)"
+                    $relay_cmd_off
+                    sleep 30
+                done
+            ) &
+            echo $! > "$pattern_pid_file"
             ;;
+
         "ALERT")
-            # 3 quick pulses
-            for i in {1..3}; do
-                mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
-                status_msg="ALERT - pulse"
-                sleep 0.3
-                mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
-                status_msg="ALERT - off"
-                sleep 0.3
-            done
+            echo "$(date): Starting ALERT siren pattern..."
+            (
+                while true; do
+                    echo "$(date): [ALERT] Siren ON (10s)"
+                    $relay_cmd_on
+                    sleep 10
+
+                    echo "$(date): [ALERT] Siren OFF (5s)"
+                    $relay_cmd_off
+                    sleep 5
+
+                    echo "$(date): [ALERT] Siren ON (10s)"
+                    $relay_cmd_on
+                    sleep 10
+
+                    echo "$(date): [ALERT] Siren OFF (1min)"
+                    $relay_cmd_off
+                    sleep 60
+                done
+            ) &
+            echo $! > "$pattern_pid_file"
             ;;
+
         "DANGER")
-            # Continuous ON
-            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
-            status_msg="DANGER - pulse"
+            echo "$(date): Siren ON continuously (DANGER)"
+            $relay_cmd_on
+            ;;
+
+        *)
+            echo "$(date): Unknown level '$level' — Siren OFF"
+            $relay_cmd_off
             ;;
     esac
-        # --- Publish MQTT Debug Info ---
-    local timestamp
-    timestamp=$(date +"%Y-%m-%dT%H:%M:%S")
-    local json_payload="{\"timestamp\":\"$timestamp\", \"siren_level\":\"$level\", \"status\":\"$status_msg\"}"
-
-    mosquitto_pub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
-        -t "$MQTT_DEBUG_TOPIC_SIREN" -q "$MQTT_QOS" -m "$json_payload" \
-        && echo "$(date): [MQTT] Published siren debug: $json_payload" \
-        || echo "$(date): [MQTT] Failed to publish siren debug" >&2
 }
+
 
 
 # Start MQTT subscription in background with retry on failure
