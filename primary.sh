@@ -256,7 +256,7 @@ control_relay_pattern() {
                     $relay_cmd_off
                     sleep 30
                 done
-            )
+            ) &
             ;;
 
         "ALERT")
@@ -279,7 +279,8 @@ control_relay_pattern() {
                     $relay_cmd_off
                     sleep 60
                 done
-            )
+            ) &
+           
             ;;
 
         "DANGER")
