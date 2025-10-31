@@ -5,10 +5,10 @@
 # Note: Update these values according to your setup
 
 # MQTT Broker Configuration
-export MQTT_BROKER="${MQTT_BROKER:-xx.xxx.xxx}"
-export MQTT_PORT="${MQTT_PORT:-1883}"
-export MQTT_CLIENT_ID="${MQTT_CLIENT_ID:-CM4-01}"
-export MQTT_TOPIC="${MQTT_TOPIC:-EA/data/CM4-01}"
+export MQTT_BROKER="${MQTT_BROKER:-zr.txio.live}"
+export MQTT_PORT="${MQTT_PORT:-1880}"
+export MQTT_CLIENT_ID="${MQTT_CLIENT_ID:-CM4-11-debug}"
+export MQTT_TOPIC="${MQTT_TOPIC:-EA/data/CM4-11-debug}"
 export MQTT_SUBSCRIBE_TOPIC="${MQTT_SUBSCRIBE_TOPIC:-EA/${MQTT_CLIENT_ID}/relay/control}"
 
 # Add new MQTT topic for mode control
