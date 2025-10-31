@@ -164,11 +164,34 @@ CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "5.0")
 
 
 # Initialize thresholds for 4 levels
-echo "8.0"  > /tmp/threshold_normal
-echo "5.0"  > /tmp/threshold_warning
-echo "3.0"  > /tmp/threshold_alert
-echo "2.0"  > /tmp/threshold_danger
-echo "5.0"  > /tmp/distance_debug
+# echo "8.0"  > /tmp/threshold_normal
+# echo "5.0"  > /tmp/threshold_warning
+# echo "3.0"  > /tmp/threshold_alert
+# echo "2.0"  > /tmp/threshold_danger
+# echo "5.0"  > /tmp/distance_debug
+
+# --- Load thresholds from persistent file or initialize defaults ---
+THRESHOLD_PERSIST_FILE="/home/pi/thresholds.conf"
+
+if [[ -f "$THRESHOLD_PERSIST_FILE" ]]; then
+    echo "$(date): Loading thresholds from $THRESHOLD_PERSIST_FILE"
+    source "$THRESHOLD_PERSIST_FILE"
+else
+    echo "$(date): Threshold config not found, creating defaults..."
+    cat <<EOF > "$THRESHOLD_PERSIST_FILE"
+THRESHOLD_NORMAL=8.0
+THRESHOLD_WARNING=5.0
+THRESHOLD_ALERT=3.0
+THRESHOLD_DANGER=2.0
+EOF
+fi
+
+# Write values into /tmp for runtime usage
+echo "$THRESHOLD_NORMAL"  > /tmp/threshold_normal
+echo "$THRESHOLD_WARNING" > /tmp/threshold_warning
+echo "$THRESHOLD_ALERT"   > /tmp/threshold_alert
+echo "$THRESHOLD_DANGER"  > /tmp/threshold_danger
+echo "5.0" > /tmp/distance_debug
 
 
 # echo "8.0"  > /tmp/threshold_normal
@@ -348,13 +371,24 @@ control_relay_pattern() {
                 echo "$(date): AUTO mode - ignoring manual command: $message"
             fi
         elif [[ "$topic" == "$MQTT_THRESHOLD_NORMAL_TOPIC" ]]; then
-          echo "$message" > /tmp/threshold_normal && echo "$(date): NORMAL threshold updated to $message"
+          echo "$message" > /tmp/threshold_normal
+          sed -i "s/^THRESHOLD_NORMAL=.*/THRESHOLD_NORMAL=$message/" "$THRESHOLD_PERSIST_FILE"
+          echo "$(date): NORMAL threshold updated & saved to $THRESHOLD_PERSIST_FILE: $message"
+
         elif [[ "$topic" == "$MQTT_THRESHOLD_WARNING_TOPIC" ]]; then
-          echo "$message" > /tmp/threshold_warning && echo "$(date): WARNING threshold updated to $message"
+          echo "$message" > /tmp/threshold_warning
+          sed -i "s/^THRESHOLD_WARNING=.*/THRESHOLD_WARNING=$message/" "$THRESHOLD_PERSIST_FILE"
+          echo "$(date): WARNING threshold updated & saved to $THRESHOLD_PERSIST_FILE: $message"
+
         elif [[ "$topic" == "$MQTT_THRESHOLD_ALERT_TOPIC" ]]; then
-          echo "$message" > /tmp/threshold_alert && echo "$(date): ALERT threshold updated to $message"
+          echo "$message" > /tmp/threshold_alert
+          sed -i "s/^THRESHOLD_ALERT=.*/THRESHOLD_ALERT=$message/" "$THRESHOLD_PERSIST_FILE"
+          echo "$(date): ALERT threshold updated & saved to $THRESHOLD_PERSIST_FILE: $message"
+
         elif [[ "$topic" == "$MQTT_THRESHOLD_DANGER_TOPIC" ]]; then
-          echo "$message" > /tmp/threshold_danger && echo "$(date): DANGER threshold updated to $message"
+          echo "$message" > /tmp/threshold_danger
+          sed -i "s/^THRESHOLD_DANGER=.*/THRESHOLD_DANGER=$message/" "$THRESHOLD_PERSIST_FILE"
+          echo "$(date): DANGER threshold updated & saved to $THRESHOLD_PERSIST_FILE: $message"
         elif [[ "$topic" == "$MQTT_DISTANCE_DEBUG_TOPIC" ]]; then
           echo "$message" > /tmp/distance_debug
 
