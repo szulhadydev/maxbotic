@@ -183,16 +183,16 @@ echo "5.0"  > /tmp/distance_debug
 THRESHOLD_PERSIST_FILE="/home/pi/thresholds.conf"
 
 if [[ -f "$THRESHOLD_PERSIST_FILE" ]]; then
-    echo "$(date): Loading thresholds from $THRESHOLD_PERSIST_FILE"
-    source "$THRESHOLD_PERSIST_FILE"
+  echo "$(date): Loading thresholds from $THRESHOLD_PERSIST_FILE"
+  source "$THRESHOLD_PERSIST_FILE"
 else
-    echo "$(date): Threshold config not found, creating defaults..."
-    cat <<EOF > "$THRESHOLD_PERSIST_FILE"
-    THRESHOLD_NORMAL=8.0
-    THRESHOLD_WARNING=5.0
-    THRESHOLD_ALERT=3.0
-    THRESHOLD_DANGER=2.0
-    EOF
+  echo "$(date): Threshold config not found, creating defaults..."
+  cat <<EOF > "$THRESHOLD_PERSIST_FILE"
+  THRESHOLD_NORMAL=8.0
+  THRESHOLD_WARNING=5.0
+  THRESHOLD_ALERT=3.0
+  THRESHOLD_DANGER=2.0
+  EOF
 fi
 
 # Write values into /tmp for runtime usage
