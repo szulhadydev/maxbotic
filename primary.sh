@@ -336,32 +336,51 @@ control_relay_pattern() {
         message=$(cut -d' ' -f2- <<< "$full_message")
 
         if [[ "$topic" == "$MQTT_MODE_TOPIC" ]]; then
-            if [[ "$message" =~ ^(AUTO|MANUAL)$ ]]; then
-                echo "$message" > /tmp/current_mode
-                echo "$(date): Switched mode to: $message"
+          if [[ "$message" =~ ^(AUTO|MANUAL)$ ]]; then
+              echo "$message" > /tmp/current_mode
+              echo "$(date): Switched mode to: $message"
 
-                if [[ "$message" == "AUTO" ]]; then
-                    # Read latest distance and threshold
-                    CURRENT_THRESHOLD=$(cat /tmp/current_threshold 2>/dev/null || echo "5.0")
-                    if RAW_VALUE=$(cat "$SENSOR_DIR/in_voltage1_raw" 2>/dev/null); then
-                        ULTRASONIC_DISTANCE=$(echo "scale=3; ($RAW_VALUE * 10) / 1303" | bc)
+              if [[ "$message" == "MANUAL" ]]; then
+                  # Stop any running siren pattern when switching to MANUAL
+                  local pattern_pid_file="/tmp/siren_pattern.pid"
+                  if [[ -f "$pattern_pid_file" ]]; then
+                      local old_pid
+                      old_pid=$(cat "$pattern_pid_file")
+                      if ps -p "$old_pid" > /dev/null 2>&1; then
+                          echo "$(date): Stopping AUTO mode siren pattern (PID $old_pid)"
+                          kill "$old_pid" 2>/dev/null
+                      fi
+                      rm -f "$pattern_pid_file"
+                  fi
+                  echo "$(date): MANUAL mode activated - siren patterns stopped"
+                  
+              elif [[ "$message" == "AUTO" ]]; then
+                  # Immediately evaluate and trigger appropriate pattern
+                  THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null || echo "2.0")
+                  THRESHOLD_ALERT=$(cat /tmp/threshold_alert 2>/dev/null || echo "3.0")
+                  THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "5.0")
+                  THRESHOLD_NORMAL=$(cat /tmp/threshold_normal 2>/dev/null || echo "8.0")
+                  ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
 
-                        if (( $(echo "$ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD" | bc -l) )); then
-                            echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE < $CURRENT_THRESHOLD — relay ON"
-                            control_relay "ON"
-                            PREVIOUS_STATE="BELOW"
-                        else
-                            echo "$(date): AUTO mode - distance $ULTRASONIC_DISTANCE >= $CURRENT_THRESHOLD — relay OFF"
-                            control_relay "OFF"
-                            PREVIOUS_STATE="ABOVE"
-                        fi
-                    else
-                        echo "$(date): AUTO mode - Failed to read sensor for immediate relay check" >&2
-                    fi
-                fi
-            else
-                echo "$(date): Invalid mode received: $message"
-            fi
+                  if (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_DANGER" | bc -l) )); then
+                      LEVEL="DANGER"
+                  elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_ALERT" | bc -l) )); then
+                      LEVEL="ALERT"
+                  elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_WARNING" | bc -l) )); then
+                      LEVEL="WARNING"
+                  elif (( $(echo "$ULTRASONIC_DISTANCE <= $THRESHOLD_NORMAL" | bc -l) )); then
+                      LEVEL="NORMAL"
+                  else
+                      LEVEL="SAFE"
+                  fi
+
+                  echo "$(date): AUTO mode activated - triggering $LEVEL pattern"
+                  control_relay_pattern "$LEVEL"
+                  echo "$LEVEL" > /tmp/previous_state
+              fi
+          else
+              echo "$(date): Invalid mode received: $message"
+          fi
         elif [[ "$topic" == "$MQTT_SUBSCRIBE_TOPIC" ]]; then
             CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
             if [[ "$CURRENT_MODE" == "MANUAL" ]]; then
@@ -460,11 +479,17 @@ while true; do
             LEVEL="SAFE"
         fi
 
+        # Load previous state
+        PREVIOUS_STATE=$(cat /tmp/previous_state 2>/dev/null || echo "UNKNOWN")
+        
         if [[ "$LEVEL" != "$PREVIOUS_STATE" ]]; then
             echo "$(date): Level changed → $LEVEL (distance: $ULTRASONIC_DISTANCE)"
             control_relay_pattern "$LEVEL"
-            PREVIOUS_STATE="$LEVEL"
+            echo "$LEVEL" > /tmp/previous_state
         fi
+    else
+        # MANUAL mode - don't trigger any automatic patterns
+        : # no-op
     fi
 
     sleep "$MEASUREMENT_INTERVAL"
