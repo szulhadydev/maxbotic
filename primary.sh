@@ -261,15 +261,11 @@ control_relay_pattern() {
         -t "$MQTT_SUBSCRIBE_TOPIC" \
         -t "$MQTT_MODE_TOPIC" \
         -t "$MQTT_THRESHOLD_TOPIC" \
-
         -t "$MQTT_THRESHOLD_NORMAL_TOPIC" \
         -t "$MQTT_THRESHOLD_WARNING_TOPIC" \
         -t "$MQTT_THRESHOLD_ALERT_TOPIC" \
         -t "$MQTT_THRESHOLD_DANGER_TOPIC" \
         -t "$MQTT_DISTANCE_DEBUG_TOPIC" \
-
-
-
         -t "$MQTT_REBOOT_TOPIC" \
         -q "$MQTT_QOS" -v | while read -r full_message; do
 
