@@ -247,7 +247,7 @@ control_relay_pattern() {
     local json_payload="{\"timestamp\":\"$timestamp\", \"siren_level\":\"$level\", \"status\":\"$status_msg\"}"
 
     mosquitto_pub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
-        -t "$MQTT_DEBUG_TOPIC" -q "$MQTT_QOS" -m "$json_payload" \
+        -t "$MQTT_DEBUG_TOPIC_SIREN" -q "$MQTT_QOS" -m "$json_payload" \
         && echo "$(date): [MQTT] Published siren debug: $json_payload" \
         || echo "$(date): [MQTT] Failed to publish siren debug" >&2
 }
@@ -353,7 +353,7 @@ while true; do
     ULTRASONIC_DISTANCE=$(cat /tmp/distance_debug 2>/dev/null || echo "5.0")
     CURRENT_MODE=$(cat /tmp/current_mode 2>/dev/null || echo "AUTO")
 
-    # --- Read thresholds (individually updated from MQTT) ---
+    # --- Read thresholds (individually updated from MQTT_DEBUG_TOPICMQTT) ---
     THRESHOLD_DANGER=$(cat /tmp/threshold_danger 2>/dev/null || echo "2.0")
     THRESHOLD_ALERT=$(cat /tmp/threshold_alert 2>/dev/null || echo "3.0")
     THRESHOLD_WARNING=$(cat /tmp/threshold_warning 2>/dev/null || echo "5.0")
