@@ -500,7 +500,15 @@ while true; do
 
     
 
-    # RIVER_DEPTH = MAX_HEIGHT - (ULTRASONIC_DISTANCE + )
+    # Calculate river depth
+    if [[ "$OFFSET_OPERATION" == "plus" ]]; then
+        RIVER_DEPTH=$(echo "$MAX_HEIGHT - ($ULTRASONIC_DISTANCE + $OFFSET_VALUE)" | bc -l)
+    elif [[ "$OFFSET_OPERATION" == "minus" ]]; then
+        RIVER_DEPTH=$(echo "$MAX_HEIGHT - ($ULTRASONIC_DISTANCE - $OFFSET_VALUE)" | bc -l)
+    else
+        echo "Unknown OFFSET_OPERATION: $OFFSET_OPERATION" >&2
+        RIVER_DEPTH="NaN"
+    fi
 
     # --- Build JSON payload for MQTT ---
     JSON_PAYLOAD="{\"distance\": $ULTRASONIC_DISTANCE, \
@@ -515,7 +523,8 @@ while true; do
 \"threshold_danger\": $THRESHOLD_DANGER, \
 \"max_height\": $MAX_HEIGHT, \
 \"offset_value\": $OFFSET_VALUE, \
-\"offset_operation\": \"$OFFSET_OPERATION\"}"
+\"offset_operation\": \"$OFFSET_OPERATION\", \
+\"river_depth\": RIVER_DEPTH}"
 
 
     # --- Publish to MQTT ---
