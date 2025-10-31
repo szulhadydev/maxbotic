@@ -173,12 +173,6 @@ echo "2.0"  > /tmp/threshold_danger
 echo "5.0"  > /tmp/distance_debug
 
 
-# echo "8.0"  > /tmp/threshold_normal
-# echo "5.0"  > /tmp/threshold_warning
-# echo "3.0"  > /tmp/threshold_alert
-# echo "1.5"  > /tmp/threshold_danger
-
-
 # --- Load thresholds from persistent file or initialize defaults ---
 THRESHOLD_PERSIST_FILE="/home/pi/thresholds.conf"
 
@@ -213,32 +207,17 @@ echo "Measurement interval: ${MEASUREMENT_INTERVAL}s"
 # Function to control relay based on MQTT messages (for MANUAL mode)
 control_relay() {
     local message="$1"
-    local relay_cmd_on="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1"
-    local relay_cmd_off="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0"
-    local pattern_pid_file="/tmp/siren_pattern.pid"
-    
-    # Stop any existing pattern process if running (important for MANUAL mode)
-    if [[ -f "$pattern_pid_file" ]]; then
-        local old_pid
-        old_pid=$(cat "$pattern_pid_file")
-        if ps -p "$old_pid" > /dev/null 2>&1; then
-            echo "$(date): [MANUAL] Stopping siren pattern (PID $old_pid)"
-            kill "$old_pid" 2>/dev/null
-        fi
-        rm -f "$pattern_pid_file"
-    fi
-    
     case "$message" in
         "ON"|"1")
-            echo "$(date): [MANUAL] Turning relay ON"
-            $relay_cmd_on
+            echo "$(date): Received command to turn relay ON"
+            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1
             ;;
         "OFF"|"0")
-            echo "$(date): [MANUAL] Turning relay OFF"
-            $relay_cmd_off
+            echo "$(date): Received command to turn relay OFF"
+            mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0
             ;;
         *)
-            echo "$(date): [MANUAL] Unknown relay command: $message"
+            echo "$(date): Received unknown relay command: $message"
             ;;
     esac
 }
@@ -249,20 +228,7 @@ control_relay_pattern() {
     local level="$1"
     local relay_cmd_on="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 1"
     local relay_cmd_off="mbpoll -m rtu -a 1 -b 9600 -P none -s 1 -t 0 -r 2 /dev/ttyAMA4 -- 0"
-    local pattern_pid_file="/tmp/siren_pattern.pid"
 
-    echo "$(date): Triggering siren pattern for level: $level"
-
-    # Stop any existing pattern process if running
-    if [[ -f "$pattern_pid_file" ]]; then
-        local old_pid
-        old_pid=$(cat "$pattern_pid_file")
-        if ps -p "$old_pid" > /dev/null 2>&1; then
-            echo "$(date): Stopping existing siren pattern (PID $old_pid)"
-            kill "$old_pid" 2>/dev/null
-        fi
-        rm -f "$pattern_pid_file"
-    fi
 
     case "$level" in
         "NORMAL"|"SAFE")
@@ -290,8 +256,7 @@ control_relay_pattern() {
                     $relay_cmd_off
                     sleep 30
                 done
-            ) &
-            echo $! > "$pattern_pid_file"
+            )
             ;;
 
         "ALERT")
@@ -314,8 +279,7 @@ control_relay_pattern() {
                     $relay_cmd_off
                     sleep 60
                 done
-            ) &
-            echo $! > "$pattern_pid_file"
+            )
             ;;
 
         "DANGER")
