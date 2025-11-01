@@ -188,9 +188,11 @@ else
   echo "ALERT_ON_INTERVAL=5" >> "$THRESHOLD_PERSIST_FILE"
   echo "ALERT_OFF_INTERVAL=5" >> "$THRESHOLD_PERSIST_FILE"
   echo "ALERT_GAP=30" >> "$THRESHOLD_PERSIST_FILE"
+  echo "ALERT_CYCLE=3" >> "$THRESHOLD_PERSIST_FILE"
   echo "WARNING_ON_INTERVAL=2.5" >> "$THRESHOLD_PERSIST_FILE"
   echo "WARNING_OFF_INTERVAL=2.5" >> "$THRESHOLD_PERSIST_FILE"
   echo "WARNING_GAP=2.5" >> "$THRESHOLD_PERSIST_FILE"
+  echo "WARNING_CYCLE=5" >> "$THRESHOLD_PERSIST_FILE"
 fi
 
 # Write values into /tmp for runtime usage
@@ -205,10 +207,12 @@ echo "$OFFSET_OPERATION"  > /tmp/offset_operation
 echo "$ALERT_ON_INTERVAL" > /tmp/alert_on_interval
 echo "$ALERT_OFF_INTERVAL" > /tmp/alert_off_interval
 echo "$ALERT_GAP" > /tmp/alert_gap
+echo "$ALERT_CYCLE" > /tmp/alert_cycle
 
 echo "$WARNING_ON_INTERVAL" > /tmp/warning_on_interval
 echo "$WARNING_OFF_INTERVAL" > /tmp/warning_off_interval
 echo "$WARNING_GAP" > /tmp/warning_gap
+echo "$WARNING_CYCLE" > /tmp/warning_cycle
 
 echo "5.0" > /tmp/distance_debug
 
@@ -258,21 +262,47 @@ control_relay_manual() {
             local on_interval=$(cat /tmp/warning_on_interval 2>/dev/null || echo 2.5)
             local off_interval=$(cat /tmp/warning_off_interval 2>/dev/null || echo 2.5)
             local gap=$(cat /tmp/warning_gap 2>/dev/null || echo 2.5)
+            local cycle=$(cat /tmp/warning_cycle 2>/dev/null || echo 5)
             echo "$(date): [MANUAL] Starting WARNING siren pattern"
             stop_siren_pattern
             (
                 while true; do
-                    echo "$(date): [MANUAL-WARNING] Siren ON (2.5s)"
-                    $relay_cmd_on
-                    sleep "$on_interval"
-                    echo "$(date): [MANUAL-WARNING] Siren OFF (2.5s)"
-                    $relay_cmd_off
-                    sleep "$off_interval"
-                    echo "$(date): [MANUAL-WARNING] Siren ON (2.5s)"
-                    $relay_cmd_on
-                    sleep "$on_interval"
-                    echo "$(date): [MANUAL-WARNING] Siren OFF (2.5s)"
-                    $relay_cmd_off
+                    # echo "$(date): [MANUAL-WARNING] Siren ON (2.5s)"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # echo "$(date): [MANUAL-WARNING] Siren OFF (2.5s)"
+                    # $relay_cmd_off
+                    # sleep "$off_interval"
+                    # echo "$(date): [MANUAL-WARNING] Siren ON (2.5s)"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # echo "$(date): [MANUAL-WARNING] Siren OFF (2.5s)"
+                    # $relay_cmd_off
+                    # sleep "$off_interval"
+                    # echo "$(date): [MANUAL-WARNING] Siren ON (2.5s)"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # echo "$(date): [MANUAL-WARNING] Siren OFF (2.5s)"
+                    # $relay_cmd_off
+                    # sleep "$off_interval"
+                    # echo "$(date): [MANUAL-WARNING] Siren ON (2.5s)"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # echo "$(date): [MANUAL-WARNING] Siren OFF (2.5s)"
+                    # $relay_cmd_off
+                    # sleep "$off_interval"
+                    # echo "$(date): [MANUAL-WARNING] Siren ON (2.5s)"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # echo "$(date): [MANUAL-WARNING] Siren OFF (2.5s)"
+                    # $relay_cmd_off
+                    # sleep "$gap"
+                    for ((i=1; i<=cycles; i++)); do
+                        $relay_cmd_on
+                        sleep "$on_interval"
+                        $relay_cmd_off
+                        sleep "$off_interval"
+                    done
                     sleep "$gap"
                 done
             ) &
@@ -282,21 +312,35 @@ control_relay_manual() {
             local on_interval=$(cat /tmp/alert_on_interval 2>/dev/null || echo 5)
             local off_interval=$(cat /tmp/alert_off_interval 2>/dev/null || echo 5)
             local gap=$(cat /tmp/alert_gap 2>/dev/null || echo 30)
+            local cycle=$(cat /tmp/alert_gap 2>/dev/null || echo 3)
             echo "$(date): [MANUAL] Starting ALERT siren pattern"
             stop_siren_pattern
             (
                 while true; do
-                    echo "$(date): [MANUAL-ALERT] Siren ON (5s)"
-                    $relay_cmd_on
-                    sleep "$on_interval"
-                    echo "$(date): [MANUAL-ALERT] Siren OFF (5s)"
-                    $relay_cmd_off
-                    sleep "$off_interval"
-                    echo "$(date): [MANUAL-ALERT] Siren ON (5s)"
-                    $relay_cmd_on
-                    sleep "$on_interval"
-                    echo "$(date): [MANUAL-ALERT] Siren OFF (30s)"
-                    $relay_cmd_off
+                    # echo "$(date): [MANUAL-ALERT] Siren ON (5s)"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # echo "$(date): [MANUAL-ALERT] Siren OFF (5s)"
+                    # $relay_cmd_off
+                    # sleep "$off_interval"
+                    # echo "$(date): [MANUAL-ALERT] Siren ON (5s)"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # echo "$(date): [MANUAL-ALERT] Siren OFF (30s)"
+                    # $relay_cmd_off
+                    # sleep "$off_interval"
+                    # echo "$(date): [MANUAL-ALERT] Siren ON (5s)"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # echo "$(date): [MANUAL-ALERT] Siren OFF (5s)"
+                    # $relay_cmd_off
+                    # sleep "$gap"
+                    for ((i=1; i<=cycles; i++)); do
+                        $relay_cmd_on
+                        sleep "$on_interval"
+                        $relay_cmd_off
+                        sleep "$off_interval"
+                    done
                     sleep "$gap"
                 done
             ) &
@@ -337,17 +381,29 @@ control_relay_pattern_auto() {
             local on_interval=$(cat /tmp/alert_on_interval 2>/dev/null || echo 5)
             local off_interval=$(cat /tmp/alert_off_interval 2>/dev/null || echo 5)
             local gap=$(cat /tmp/alert_gap 2>/dev/null || echo 30)
+            local cycle=$(cat /tmp/alert_cycle 2>/dev/null || echo 3)
             echo "$(date): [AUTO] Starting ALERT siren pattern..."
             
             (
                 while true; do
-                    $relay_cmd_on
-                    sleep "$on_interval"
-                    $relay_cmd_off
-                    sleep "$off_interval"
-                    $relay_cmd_on
-                    sleep "$on_interval"
-                    $relay_cmd_off
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # $relay_cmd_off
+                    # sleep "$off_interval"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # $relay_cmd_off
+                    # sleep "$on_interval"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # $relay_cmd_off
+                    # sleep "$gap"
+                    for ((i=1; i<=cycles; i++)); do
+                        $relay_cmd_on
+                        sleep "$on_interval"
+                        $relay_cmd_off
+                        sleep "$off_interval"
+                    done
                     sleep "$gap"
                 done
             ) &
@@ -358,16 +414,36 @@ control_relay_pattern_auto() {
             local on_interval=$(cat /tmp/warning_on_interval 2>/dev/null || echo 2.5)
             local off_interval=$(cat /tmp/warning_off_interval 2>/dev/null || echo 2.5)
             local gap=$(cat /tmp/warning_gap 2>/dev/null || echo 2.5)
+            local cycle=$(cat /tmp/warning_cycle 2>/dev/null || echo 5)
             echo "$(date): [AUTO] Starting WARNING siren pattern..."
             (
                 while true; do
-                    $relay_cmd_on
-                    sleep "$on_interval"
-                    $relay_cmd_off
-                    sleep "$off_interval"
-                    $relay_cmd_on
-                    sleep "$on_interval"
-                    $relay_cmd_off
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # $relay_cmd_off
+                    # sleep "$off_interval"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # $relay_cmd_off
+                    # sleep "$off_interval"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # $relay_cmd_off
+                    # sleep "$off_interval"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # $relay_cmd_off
+                    # sleep "$off_interval"
+                    # $relay_cmd_on
+                    # sleep "$on_interval"
+                    # $relay_cmd_off
+                    # sleep "$gap"
+                    for ((i=1; i<=cycles; i++)); do
+                        $relay_cmd_on
+                        sleep "$on_interval"
+                        $relay_cmd_off
+                        sleep "$off_interval"
+                    done
                     sleep "$gap"
                 done
             ) &
@@ -397,9 +473,11 @@ control_relay_pattern_auto() {
         -t "$MQTT_ALERT_ON_INTERVAL_TOPIC" \
         -t "$MQTT_ALERT_OFF_INTERVAL_TOPIC" \
         -t "$MQTT_ALERT_GAP_TOPIC" \
+        -t "$MQTT_ALERT_CYCLE_TOPIC" \
         -t "$MQTT_WARNING_ON_INTERVAL_TOPIC" \
         -t "$MQTT_WARNING_OFF_INTERVAL_TOPIC" \
         -t "$MQTT_WARNING_GAP_TOPIC" \
+        -t "$MQTT_WARNING_CYCLE_TOPIC" \
         -t "$MQTT_DISTANCE_DEBUG_TOPIC" \
         -t "$MQTT_REBOOT_TOPIC" \
         -q "$MQTT_QOS" -v | while read -r full_message; do
@@ -523,6 +601,9 @@ control_relay_pattern_auto() {
         elif [[ "$topic" == "$MQTT_ALERT_GAP_TOPIC" ]]; then
             echo "$message" > /tmp/alert_gap
             sed -i "s/^ALERT_GAP=.*/ALERT_GAP=$message/" "$THRESHOLD_PERSIST_FILE"
+        elif [[ "$topic" == "$MQTT_ALERT_CYCLE_TOPIC" ]]; then
+            echo "$message" > /tmp/alert_cycle
+            sed -i "s/^ALERT_CYCLE=.*/ALERT_CYCLE=$message/" "$THRESHOLD_PERSIST_FILE"
 
         elif [[ "$topic" == "$MQTT_WARNING_ON_INTERVAL_TOPIC" ]]; then
             echo "$message" > /tmp/warning_on_interval
@@ -533,6 +614,9 @@ control_relay_pattern_auto() {
         elif [[ "$topic" == "$MQTT_WARNING_GAP_TOPIC" ]]; then
             echo "$message" > /tmp/warning_gap
             sed -i "s/^WARNING_GAP=.*/WARNING_GAP=$message/" "$THRESHOLD_PERSIST_FILE"
+        elif [[ "$topic" == "$MQTT_WARNING_CYCLE_TOPIC" ]]; then
+            echo "$message" > /tmp/warning_cycle
+            sed -i "s/^WARNING_CYCLE=.*/WARNING_CYCLE=$message/" "$THRESHOLD_PERSIST_FILE"
 
         elif [[ "$topic" == "$MQTT_DISTANCE_DEBUG_TOPIC" ]]; then
             echo "$message" > /tmp/distance_debug
@@ -581,10 +665,12 @@ while true; do
     ALERT_ON_INTERVAL=$(cat /tmp/alert_on_interval 2>/dev/null || echo "5")
     ALERT_OFF_INTERVAL=$(cat /tmp/alert_off_interval 2>/dev/null || echo "5")
     ALERT_GAP=$(cat /tmp/alert_gap 2>/dev/null || echo "30")
+    ALERT_CYCLE=$(cat /tmp/alert_cycle 2>/dev/null || echo "3")
 
     WARNING_ON_INTERVAL=$(cat /tmp/warning_on_interval 2>/dev/null || echo "2.5")
     WARNING_OFF_INTERVAL=$(cat /tmp/warning_off_interval 2>/dev/null || echo "2.5")
     WARNING_GAP=$(cat /tmp/warning_gap 2>/dev/null || echo "2.5")
+    WARNING_CYCLE=$(cat /tmp/warning_cycle 2>/dev/null || echo "5")
 
 
     TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
@@ -642,9 +728,11 @@ fi
 \"alert_on_interval\": $ALERT_ON_INTERVAL, \
 \"alert_off_interval\": $ALERT_OFF_INTERVAL, \
 \"alert_gap\": $ALERT_GAP, \
+\"alert_cycle\": $ALERT_CYCLE, \
 \"warning_on_interval\": $WARNING_ON_INTERVAL, \
 \"warning_off_interval\": $WARNING_OFF_INTERVAL, \
-\"warning_gap\": $WARNING_GAP}"
+\"warning_gap\": $WARNING_GAP, \
+\"warning_cycle\": $WARNING_CYCLE}"
 
 
     # --- Publish to MQTT ---
