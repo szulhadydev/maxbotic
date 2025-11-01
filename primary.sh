@@ -651,6 +651,12 @@ fi
         -t "$MQTT_TOPIC" -q "$MQTT_QOS" -m "$JSON_PAYLOAD" \
         && echo "$(date): [MQTT] Distance: $ULTRASONIC_DISTANCE m (published)" \
         || echo "$(date): [MQTT] Publish failed" >&2
+    # --- Publish to MQTT ---
+
+    mosquitto_pub -h "$MQTT_BROKER" -p "$MQTT_PORT" \
+        -t "$MQTT_TOPIC_SIREN_PATTERN" -q "$MQTT_QOS" -m "$JSON_PAYLOAD_SIREN" \
+        && echo "$(date): [MQTT] Siren pattern: (published)" \
+        || echo "$(date): [MQTT] Publish failed" >&2
 
     # --- AUTO mode: compare against thresholds ---
     if [[ "$CURRENT_MODE" == "AUTO" ]]; then
