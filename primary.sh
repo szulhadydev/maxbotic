@@ -639,10 +639,10 @@ fi
 
     # --- Build JSON payload for MQTT ---
     JSON_PAYLOAD_SIREN="{\"alert_on_interval\": $ALERT_ON_INTERVAL, \
-\"alert_off_interval\": ALERT_OFF_INTERVAL, \
-\"alert_gap\": ALERT_GAP, \
-\"warning_on_interval\": WARNING_ON_INTERVAL, \
-\"warning_off_interval\": WARNING_OFF_INTERVAL, \
+\"alert_off_interval\": $ALERT_OFF_INTERVAL, \
+\"alert_gap\": $ALERT_GAP, \
+\"warning_on_interval\": $WARNING_ON_INTERVAL, \
+\"warning_off_interval\": $WARNING_OFF_INTERVAL, \
 \"warning_gap\": $WARNING_GAP}"
 
 
