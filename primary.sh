@@ -583,7 +583,7 @@ while true; do
     ALERT_GAP=$(cat /tmp/alert_gap 2>/dev/null || echo "30")
 
     WARNING_ON_INTERVAL=$(cat /tmp/warning_on_interval 2>/dev/null || echo "2.5")
-    WARNING_OFF_INTERVAL=$(cat /tmp/alert_off_interval 2>/dev/null || echo "2.5")
+    WARNING_OFF_INTERVAL=$(cat /tmp/warning_off_interval 2>/dev/null || echo "2.5")
     WARNING_GAP=$(cat /tmp/warning_gap 2>/dev/null || echo "2.5")
 
 
