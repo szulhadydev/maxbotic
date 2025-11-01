@@ -185,6 +185,12 @@ else
   echo "MAX_HEIGHT=3.9" >> "$THRESHOLD_PERSIST_FILE"
   echo "OFFSET_VALUE=1.0" >> "$THRESHOLD_PERSIST_FILE"
   echo "OFFSET_OPERATION=minus" >> "$THRESHOLD_PERSIST_FILE"
+  echo "ALERT_ON_INTERVAL=2.5" >> "$THRESHOLD_PERSIST_FILE"
+  echo "ALERT_OFF_INTERVAL=2.5" >> "$THRESHOLD_PERSIST_FILE"
+  echo "ALERT_GAP=2.5" >> "$THRESHOLD_PERSIST_FILE"
+  echo "WARNING_ON_INTERVAL=5" >> "$THRESHOLD_PERSIST_FILE"
+  echo "WARNING_OFF_INTERVAL=5" >> "$THRESHOLD_PERSIST_FILE"
+  echo "WARNING_GAP=30" >> "$THRESHOLD_PERSIST_FILE"
 fi
 
 # Write values into /tmp for runtime usage
@@ -195,6 +201,15 @@ echo "$THRESHOLD_DANGER"  > /tmp/threshold_danger
 echo "$MAX_HEIGHT"  > /tmp/max_height
 echo "$OFFSET_VALUE"  > /tmp/offset_value
 echo "$OFFSET_OPERATION"  > /tmp/offset_operation
+
+echo "$ALERT_ON_INTERVAL" > /tmp/alert_on_interval
+echo "$ALERT_OFF_INTERVAL" > /tmp/alert_off_interval
+echo "$ALERT_GAP" > /tmp/alert_gap
+
+echo "$WARNING_ON_INTERVAL" > /tmp/warning_on_interval
+echo "$WARNING_OFF_INTERVAL" > /tmp/warning_off_interval
+echo "$WARNING_GAP" > /tmp/warning_gap
+
 echo "5.0" > /tmp/distance_debug
 
 # State tracking for relay logic
@@ -240,43 +255,49 @@ control_relay_manual() {
             $relay_cmd_off
             ;;
         "WARNING")
+            local on_interval=$(cat /tmp/warning_on_interval 2>/dev/null || echo 2.5)
+            local off_interval=$(cat /tmp/warning_off_interval 2>/dev/null || echo 2.5)
+            local gap=$(cat /tmp/warning_gap 2>/dev/null || echo 2.5)
             echo "$(date): [MANUAL] Starting WARNING siren pattern"
             stop_siren_pattern
             (
                 while true; do
-                    echo "$(date): [MANUAL-WARNING] Siren ON (10s)"
+                    echo "$(date): [MANUAL-WARNING] Siren ON (2.5s)"
                     $relay_cmd_on
-                    sleep 10
-                    echo "$(date): [MANUAL-WARNING] Siren OFF (5s)"
+                    sleep "$on_interval"
+                    echo "$(date): [MANUAL-WARNING] Siren OFF (2.5s)"
                     $relay_cmd_off
-                    sleep 5
-                    echo "$(date): [MANUAL-WARNING] Siren ON (10s)"
+                    sleep "$off_interval"
+                    echo "$(date): [MANUAL-WARNING] Siren ON (2.5s)"
                     $relay_cmd_on
-                    sleep 10
-                    echo "$(date): [MANUAL-WARNING] Siren OFF (30s)"
+                    sleep "$on_interval"
+                    echo "$(date): [MANUAL-WARNING] Siren OFF (2.5s)"
                     $relay_cmd_off
-                    sleep 30
+                    sleep "$gap"
                 done
             ) &
             echo $! > "$PATTERN_PID_FILE"
             ;;
         "ALERT")
+            local on_interval=$(cat /tmp/alert_on_interval 2>/dev/null || echo 5)
+            local off_interval=$(cat /tmp/alert_off_interval 2>/dev/null || echo 5)
+            local gap=$(cat /tmp/alert_gap 2>/dev/null || echo 30)
             echo "$(date): [MANUAL] Starting ALERT siren pattern"
             stop_siren_pattern
             (
                 while true; do
-                    echo "$(date): [MANUAL-ALERT] Siren ON (10s)"
+                    echo "$(date): [MANUAL-ALERT] Siren ON (5s)"
                     $relay_cmd_on
-                    sleep 10
+                    sleep "$on_interval"
                     echo "$(date): [MANUAL-ALERT] Siren OFF (5s)"
                     $relay_cmd_off
-                    sleep 5
-                    echo "$(date): [MANUAL-ALERT] Siren ON (10s)"
+                    sleep "$off_interval"
+                    echo "$(date): [MANUAL-ALERT] Siren ON (5s)"
                     $relay_cmd_on
-                    sleep 10
-                    echo "$(date): [MANUAL-ALERT] Siren OFF (1min)"
+                    sleep "$on_interval"
+                    echo "$(date): [MANUAL-ALERT] Siren OFF (30s)"
                     $relay_cmd_off
-                    sleep 60
+                    sleep "$gap"
                 done
             ) &
             echo $! > "$PATTERN_PID_FILE"
@@ -313,34 +334,41 @@ control_relay_pattern_auto() {
             ;;
 
         "ALERT")
+            local on_interval=$(cat /tmp/alert_on_interval 2>/dev/null || echo 5)
+            local off_interval=$(cat /tmp/alert_off_interval 2>/dev/null || echo 5)
+            local gap=$(cat /tmp/alert_gap 2>/dev/null || echo 30)
             echo "$(date): [AUTO] Starting ALERT siren pattern..."
+            
             (
                 while true; do
                     $relay_cmd_on
-                    sleep 10
+                    sleep "$on_interval"
                     $relay_cmd_off
-                    sleep 5
+                    sleep "$off_interval"
                     $relay_cmd_on
-                    sleep 10
+                    sleep "$on_interval"
                     $relay_cmd_off
-                    sleep 60
+                    sleep "$gap"
                 done
             ) &
             echo $! > "$PATTERN_PID_FILE"
             ;;
 
         "WARNING")
+            local on_interval=$(cat /tmp/warning_on_interval 2>/dev/null || echo 2.5)
+            local off_interval=$(cat /tmp/warning_off_interval 2>/dev/null || echo 2.5)
+            local gap=$(cat /tmp/warning_gap 2>/dev/null || echo 2.5)
             echo "$(date): [AUTO] Starting WARNING siren pattern..."
             (
                 while true; do
                     $relay_cmd_on
-                    sleep 10
+                    sleep "$on_interval"
                     $relay_cmd_off
-                    sleep 5
+                    sleep "$off_interval"
                     $relay_cmd_on
-                    sleep 10
+                    sleep "$on_interval"
                     $relay_cmd_off
-                    sleep 30
+                    sleep "$gap"
                 done
             ) &
             echo $! > "$PATTERN_PID_FILE"
@@ -366,6 +394,12 @@ control_relay_pattern_auto() {
         -t "$MQTT_MAX_HEIGHT_TOPIC" \
         -t "$MQTT_OFFSET_VALUE_TOPIC" \
         -t "$MQTT_OFFSET_OPERATION_TOPIC" \
+        -t "$MQTT_ALERT_ON_INTERVAL_TOPIC" \
+        -t "$MQTT_ALERT_OFF_INTERVAL_TOPIC" \
+        -t "$MQTT_ALERT_GAP_TOPIC" \
+        -t "$MQTT_WARNING_ON_INTERVAL_TOPIC" \
+        -t "$MQTT_WARNING_OFF_INTERVAL_TOPIC" \
+        -t "$MQTT_WARNING_GAP_TOPIC" \
         -t "$MQTT_DISTANCE_DEBUG_TOPIC" \
         -t "$MQTT_REBOOT_TOPIC" \
         -q "$MQTT_QOS" -v | while read -r full_message; do
@@ -479,6 +513,26 @@ control_relay_pattern_auto() {
         elif [[ "$topic" == "$MQTT_OFFSET_OPERATION_TOPIC" ]]; then
             echo "$message" > /tmp/offset_operation
             sed -i "s/^OFFSET_OPERATION=.*/OFFSET_OPERATION=$message/" "$THRESHOLD_PERSIST_FILE"
+
+        elif [[ "$topic" == "$MQTT_ALERT_ON_INTERVAL_TOPIC" ]]; then
+            echo "$message" > /tmp/alert_on_interval
+            sed -i "s/^ALERT_ON_INTERVAL=.*/ALERT_ON_INTERVAL=$message/" "$THRESHOLD_PERSIST_FILE"
+        elif [[ "$topic" == "$MQTT_ALERT_OFF_INTERVAL_TOPIC" ]]; then
+            echo "$message" > /tmp/alert_off_interval
+            sed -i "s/^ALERT_OFF_INTERVAL=.*/ALERT_OFF_INTERVAL=$message/" "$THRESHOLD_PERSIST_FILE"
+        elif [[ "$topic" == "$MQTT_ALERT_GAP_TOPIC" ]]; then
+            echo "$message" > /tmp/alert_gap
+            sed -i "s/^ALERT_GAP=.*/ALERT_GAP=$message/" "$THRESHOLD_PERSIST_FILE"
+
+        elif [[ "$topic" == "$MQTT_WARNING_ON_INTERVAL_TOPIC" ]]; then
+            echo "$message" > /tmp/warning_on_interval
+            sed -i "s/^WARNING_ON_INTERVAL=.*/WARNING_ON_INTERVAL=$message/" "$THRESHOLD_PERSIST_FILE"
+        elif [[ "$topic" == "$MQTT_WARNING_OFF_INTERVAL_TOPIC" ]]; then
+            echo "$message" > /tmp/warning_off_interval
+            sed -i "s/^WARNING_OFF_INTERVAL=.*/WARNING_OFF_INTERVAL=$message/" "$THRESHOLD_PERSIST_FILE"
+        elif [[ "$topic" == "$MQTT_WARNING_GAP_TOPIC" ]]; then
+            echo "$message" > /tmp/warning_gap
+            sed -i "s/^WARNING_GAP=.*/WARNING_GAP=$message/" "$THRESHOLD_PERSIST_FILE"
 
         elif [[ "$topic" == "$MQTT_DISTANCE_DEBUG_TOPIC" ]]; then
             echo "$message" > /tmp/distance_debug
