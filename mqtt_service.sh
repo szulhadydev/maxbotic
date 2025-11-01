@@ -9,6 +9,7 @@ export MQTT_BROKER="${MQTT_BROKER:-xx.xxxx.xxxx}"
 export MQTT_PORT="${MQTT_PORT:-1883}"
 export MQTT_CLIENT_ID="${MQTT_CLIENT_ID:-CM4-01}"
 export MQTT_TOPIC="${MQTT_TOPIC:-EA/data/CM4-01}"
+export MQTT_TOPIC_SIREN_PATTERN="${MQTT_TOPIC_SIREN_PATTERN:-EA/CM4-01/siren/pattern}"
 export MQTT_SUBSCRIBE_TOPIC="${MQTT_SUBSCRIBE_TOPIC:-EA/${MQTT_CLIENT_ID}/relay/control}"
 
 # Add new MQTT topic for mode control

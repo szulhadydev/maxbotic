@@ -578,6 +578,15 @@ while true; do
     OFFSET_VALUE=$(cat /tmp/offset_value 2>/dev/null || echo "1.0")
     OFFSET_OPERATION=$(cat /tmp/offset_operation 2>/dev/null || echo "minus")
 
+    ALERT_ON_INTERVAL=$(cat /tmp/alert_on_interval 2>/dev/null || echo "5")
+    ALERT_OFF_INTERVAL=$(cat /tmp/alert_off_interval 2>/dev/null || echo "5")
+    ALERT_GAP=$(cat /tmp/alert_gap 2>/dev/null || echo "30")
+
+    WARNING_ON_INTERVAL=$(cat /tmp/warning_on_interval 2>/dev/null || echo "2.5")
+    WARNING_OFF_INTERVAL=$(cat /tmp/alert_off_interval 2>/dev/null || echo "2.5")
+    WARNING_GAP=$(cat /tmp/warning_gap 2>/dev/null || echo "2.5")
+
+
     TIMESTAMP=$(date +"%Y-%m-%dT%H:%M:%S.%3N")
 
     
@@ -626,6 +635,15 @@ fi
 \"offset_operation\": \"$OFFSET_OPERATION\", \
 \"river_depth\": $RIVER_DEPTH, \
 \"water_level\": \"$WATER_LEVEL\"}"
+
+
+    # --- Build JSON payload for MQTT ---
+    JSON_PAYLOAD_SIREN="{\"alert_on_interval\": $ALERT_ON_INTERVAL, \
+\"alert_off_interval\": ALERT_OFF_INTERVAL, \
+\"alert_gap\": ALERT_GAP, \
+\"warning_on_interval\": WARNING_ON_INTERVAL, \
+\"warning_off_interval\": WARNING_OFF_INTERVAL, \
+\"warning_gap\": $WARNING_GAP}"
 
 
     # --- Publish to MQTT ---
