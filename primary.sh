@@ -297,7 +297,7 @@ control_relay_manual() {
                     # echo "$(date): [MANUAL-WARNING] Siren OFF (2.5s)"
                     # $relay_cmd_off
                     # sleep "$gap"
-                    for ((i=1; i<=$cycles; i++)); do
+                    for ((i=1; i<=$cycle; i++)); do
                         $relay_cmd_on
                         sleep "$on_interval"
                         $relay_cmd_off
@@ -335,7 +335,7 @@ control_relay_manual() {
                     # echo "$(date): [MANUAL-ALERT] Siren OFF (5s)"
                     # $relay_cmd_off
                     # sleep "$gap"
-                    for ((i=1; i<=$cycles; i++)); do
+                    for ((i=1; i<=$cycle; i++)); do
                         $relay_cmd_on
                         sleep "$on_interval"
                         $relay_cmd_off
@@ -398,7 +398,7 @@ control_relay_pattern_auto() {
                     # sleep "$on_interval"
                     # $relay_cmd_off
                     # sleep "$gap"
-                    for ((i=1; i<=$cycles; i++)); do
+                    for ((i=1; i<=$cycle; i++)); do
                         $relay_cmd_on
                         sleep "$on_interval"
                         $relay_cmd_off
@@ -438,7 +438,7 @@ control_relay_pattern_auto() {
                     # sleep "$on_interval"
                     # $relay_cmd_off
                     # sleep "$gap"
-                    for ((i=1; i<=$cycles; i++)); do
+                    for ((i=1; i<=$cycle; i++)); do
                         $relay_cmd_on
                         sleep "$on_interval"
                         $relay_cmd_off
